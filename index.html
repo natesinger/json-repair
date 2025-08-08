@@ -1,14 +1,343 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite + React + TS</title>
-  </head>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>JSON Repair & Beautifier</title>
+  <style>
+    :root {
+      --bg: #0b0f14;
+      --panel: #121823;
+      --panel-2: #0f1520;
+      --text: #e6edf3;
+      --muted: #8b98a5;
+      --accent: #5b9cff;
+      --accent-2: #4cd1a1;
+      --error: #ff6b6b;
+      --border: #1f2a37;
+      --code: #d1e3ff;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    }
+    html, body { height: 100%; }
+    body {
+      margin: 0; background: radial-gradient(1200px 1000px at 10% -10%, #0d1623, var(--bg)), var(--bg);
+      color: var(--text); font-family: var(--sans);
+    }
+    header { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:16px 20px; border-bottom:1px solid var(--border); background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0)) }
+    .title { font-weight: 700; letter-spacing: .2px; font-size: 18px; }
+    .title small{ color: var(--muted); font-weight: 500; }
+    .wrap { height: calc(100% - 64px); display:grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px; }
+    .pane { background: linear-gradient(180deg, var(--panel), var(--panel-2)); border: 1px solid var(--border); border-radius: 14px; display:flex; flex-direction:column; min-height: 0; }
+    .pane header { background: transparent; border: 0; padding: 10px 12px; }
+    .toolbar { display:flex; align-items:center; gap:8px; flex-wrap: wrap; }
+    .toolbar .spacer { flex: 1 1 auto; }
+    button, .button {
+      background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(0,0,0,0.1));
+      border: 1px solid var(--border); color: var(--text); padding: 8px 12px; border-radius: 10px; cursor: pointer; font-weight: 600;
+    }
+    button:hover { border-color: #2a3a4d; transform: translateY(-0.5px); }
+    button.primary { background: linear-gradient(180deg, rgba(91,156,255,.35), rgba(25,65,135,.35)); border-color: rgba(91,156,255,.5); }
+    button.good { background: linear-gradient(180deg, rgba(76,209,161,.25), rgba(15,50,36,.35)); border-color: rgba(76,209,161,.55); }
+    .kbd { font-family: var(--mono); font-size: 12px; padding: 2px 6px; border:1px solid var(--border); border-bottom-width:2px; border-radius:6px; color: var(--muted); }
+    textarea, pre, code { font-family: var(--mono); }
+    textarea {
+      resize: none; flex:1 1 auto; background: transparent; color: var(--code); border: 0; outline: none; padding: 12px; line-height: 1.45; font-size: 14px; white-space: pre;
+    }
+    .output { flex:1 1 auto; padding: 12px; overflow: auto; }
+    pre.pretty { margin:0; white-space: pre; color: var(--code); }
+    .error { color: var(--error); font-size: 13px; padding: 8px 12px; border-top:1px solid var(--border); background: rgba(255,0,0,0.06); }
+    .status { color: var(--muted); font-size: 12px; padding: 4px 12px; border-top:1px solid var(--border); display:flex; gap:12px; }
+    .pill { padding: 4px 8px; border-radius:999px; background: rgba(255,255,255,.06); border:1px solid var(--border); }
+    .json-tree { font-size: 13px; line-height: 1.5; }
+    .json-key { color: #9cdcfe; }
+    .json-string { color: #ce9178; }
+    .json-number { color: #b5cea8; }
+    .json-boolean { color: #4fc1ff; }
+    .json-null { color: #c586c0; }
+    .row { display:flex; gap:10px; align-items:center; }
+    .toggle { display:flex; align-items:center; gap:8px; color: var(--muted); font-size: 13px; }
+    input[type="checkbox"] { width: 14px; height: 14px; }
+    @media (max-width: 980px){ .wrap{ grid-template-columns: 1fr; height: auto; min-height: calc(100% - 64px);} }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="title">JSON Repair & Beautifier <small>— paste anything, get valid JSON</small></div>
+    <div class="toolbar">
+      <span class="toggle"><input id="autofix" type="checkbox" checked> Auto‑repair on paste</span>
+      <span class="toggle"><input id="visualize" type="checkbox" checked> Visualize tree</span>
+      <span class="kbd">⌘/Ctrl + B</span>
+      <span class="kbd">⌘/Ctrl + M</span>
+    </div>
+  </header>
 
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/react-app/main.tsx"></script>
-  </body>
+  <main class="wrap">
+    <section class="pane" id="left">
+      <header>
+        <div class="toolbar">
+          <strong>Input</strong>
+          <div class="spacer"></div>
+          <button id="btnSample">Sample</button>
+          <button id="btnClear">Clear</button>
+        </div>
+      </header>
+      <textarea id="input" spellcheck="false" placeholder="Paste JSON, Python dict, or messy data here…"></textarea>
+      <div class="status" id="inStatus"></div>
+    </section>
+
+    <section class="pane" id="right">
+      <header>
+        <div class="toolbar">
+          <strong>Output</strong>
+          <div class="spacer"></div>
+          <button id="btnRepair" class="primary">Repair & Beautify</button>
+          <button id="btnMin" title="Minify (⌘/Ctrl+M)">Minify</button>
+          <button id="btnCopy" class="good">Copy</button>
+          <button id="btnDownload">Download .json</button>
+        </div>
+      </header>
+      <div class="output">
+        <pre class="pretty" id="pretty"></pre>
+        <div id="tree" class="json-tree"></div>
+      </div>
+      <div class="error" id="error" hidden></div>
+      <div class="status" id="outStatus"></div>
+    </section>
+  </main>
+
+  <script>
+    const $ = (sel) => document.querySelector(sel);
+    const inputEl = $('#input');
+    const prettyEl = $('#pretty');
+    const treeEl = $('#tree');
+    const errEl = $('#error');
+    const outStatus = $('#outStatus');
+    const inStatus = $('#inStatus');
+
+    // ————— Core repair function: tolerant JSON clean‑up —————
+    function repairJson(text) {
+      if (!text) return '';
+      let s = text.trim();
+
+      // Normalize Unicode quotes → straight quotes
+      s = s.replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"');
+
+      // Remove BOM
+      s = s.replace(/^\uFEFF/, '');
+
+      // Remove /* block */ and // line comments (but not URLs)
+      s = s.replace(/\/\*[\s\S]*?\*\//g, '');
+      s = s.replace(/(^|[^:])\/\/.*$/gm, '$1');
+
+      // Convert Python/JS variants → JSON
+      s = s
+        .replace(/\bTrue\b/g, 'true')
+        .replace(/\bFalse\b/g, 'false')
+        .replace(/\bNone\b/g, 'null')
+        .replace(/\bNaN\b/g, 'null')
+        .replace(/\bundefined\b/g, 'null');
+
+      // Quote unquoted object keys: {foo:1, bar_baz:2} → {"foo":1, "bar_baz":2}
+      s = s.replace(/([,{]\s*)([A-Za-z_][\w-]*)(\s*:)/g, '$1"$2"$3');
+
+      // Convert single‑quoted strings → double‑quoted, preserving escapes
+      s = s.replace(/'([^'\\]|\\.)*'/g, (m) => {
+        const inner = m.slice(1, -1);
+        const escaped = inner
+          .replace(/\\/g, '\\\\')    // escape backslashes first
+          .replace(/\"/g, '"')          // normalize any \"
+          .replace(/"/g, '\\"');       // then escape quotes
+        return '"' + escaped + '"';
+      });
+
+      // Remove trailing commas in objects/arrays
+      s = s.replace(/,\s*([}\]])/g, '$1');
+
+      // Trim dangling commas at end of input
+      s = s.replace(/,\s*$/, '');
+
+      return s;
+    }
+
+    // Safe parse with error reporting
+    function safeParse(text) {
+      const before = performance.now();
+      const cleaned = repairJson(text);
+      try {
+        const obj = JSON.parse(cleaned);
+        const after = performance.now();
+        return { ok: true, obj, cleaned, ms: (after - before).toFixed(1) };
+      } catch (e) {
+        return { ok: false, error: e.message, cleaned };
+      }
+    }
+
+    // Pretty print & optional tree visualization
+    function renderOutput(obj) {
+      prettyEl.textContent = JSON.stringify(obj, null, 2);
+      if ($('#visualize').checked) {
+        treeEl.innerHTML = '';
+        treeEl.appendChild(renderTree(obj));
+      } else {
+        treeEl.innerHTML = '';
+      }
+    }
+
+    function renderPrimitive(val) {
+      const span = document.createElement('span');
+      if (typeof val === 'string') {
+        span.className = 'json-string';
+        span.textContent = '"' + val + '"';
+      } else if (typeof val === 'number') {
+        span.className = 'json-number';
+        span.textContent = String(val);
+      } else if (typeof val === 'boolean') {
+        span.className = 'json-boolean';
+        span.textContent = String(val);
+      } else if (val === null) {
+        span.className = 'json-null';
+        span.textContent = 'null';
+      }
+      return span;
+    }
+
+    function renderTree(value, key) {
+      if (value === null || typeof value !== 'object') {
+        const line = document.createElement('div');
+        if (key !== undefined) {
+          const k = document.createElement('span');
+          k.className = 'json-key';
+          k.textContent = JSON.stringify(String(key)) + ': ';
+          line.appendChild(k);
+        }
+        line.appendChild(renderPrimitive(value));
+        return line;
+      }
+
+      const details = document.createElement('details');
+      details.open = true;
+      const summary = document.createElement('summary');
+      summary.innerHTML = (key !== undefined ? `<span class="json-key">${JSON.stringify(String(key))}</span>: ` : '') +
+        (Array.isArray(value) ? `Array[${value.length}]` : 'Object');
+      details.appendChild(summary);
+
+      const container = document.createElement('div');
+      container.style.paddingLeft = '12px';
+
+      if (Array.isArray(value)) {
+        value.forEach((v, i) => container.appendChild(renderTree(v, i)));
+      } else {
+        Object.keys(value).forEach(k => container.appendChild(renderTree(value[k], k)));
+      }
+
+      details.appendChild(container);
+      return details;
+    }
+
+    function doRepair(pretty = true) {
+      const { ok, obj, error, cleaned, ms } = safeParse(inputEl.value);
+      if (ok) {
+        errEl.hidden = true; errEl.textContent = '';
+        renderOutput(obj);
+        const bytes = new Blob([JSON.stringify(obj)]).size;
+        outStatus.innerHTML = `<span class="pill">Parsed ✓</span><span class="pill">${ms} ms</span><span class="pill">${(bytes/1024).toFixed(1)} KB</span>`;
+      } else {
+        errEl.hidden = false; errEl.textContent = 'Parse error: ' + error;
+        // Show the cleaned text to help users see what changed
+        prettyEl.textContent = cleaned;
+        treeEl.innerHTML = '';
+        outStatus.innerHTML = `<span class="pill">Needs more fixing</span>`;
+      }
+    }
+
+    // ————— UI wiring —————
+    $('#btnRepair').addEventListener('click', () => doRepair(true));
+    $('#btnMin').addEventListener('click', () => {
+      const res = safeParse(inputEl.value);
+      if (res.ok) {
+        prettyEl.textContent = JSON.stringify(res.obj);
+        treeEl.innerHTML = '';
+        errEl.hidden = true; errEl.textContent = '';
+      } else {
+        errEl.hidden = false; errEl.textContent = 'Parse error: ' + res.error;
+        prettyEl.textContent = res.cleaned;
+      }
+    });
+
+    $('#btnCopy').addEventListener('click', async () => {
+      const text = prettyEl.textContent || '';
+      if (!text) return;
+      await navigator.clipboard.writeText(text);
+      flash('Copied to clipboard');
+    });
+
+    $('#btnDownload').addEventListener('click', () => {
+      const blob = new Blob([prettyEl.textContent || ''], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'data.json';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
+
+    $('#btnClear').addEventListener('click', () => { inputEl.value=''; inStatus.textContent=''; prettyEl.textContent=''; treeEl.innerHTML=''; errEl.hidden=true; errEl.textContent=''; });
+
+    $('#btnSample').addEventListener('click', () => {
+      inputEl.value = `# messy example (Python dict + comments + trailing commas)\n{\n  user: 'nate',  # inline comment\n  id: 12345,\n  active: True,\n  meta: {\n    note: 'He said: \'hello\'',\n    last_login: None,\n  },\n  tags: ['a', 'b',],\n}\n`;
+      doRepair();
+    });
+
+    // Drag & drop file → load into input
+    ;['dragenter','dragover','dragleave','drop'].forEach(evt => {
+      document.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); }, false);
+    });
+    document.addEventListener('drop', async (e) => {
+      const f = e.dataTransfer.files?.[0];
+      if (!f) return;
+      const text = await f.text();
+      inputEl.value = text;
+      if ($('#autofix').checked) doRepair();
+    });
+
+    // Auto‑repair on paste
+    inputEl.addEventListener('paste', (e) => {
+      setTimeout(() => { if ($('#autofix').checked) doRepair(); }, 0);
+    });
+
+    // Input stats
+    const updateInStatus = () => {
+      const len = inputEl.value.length;
+      const lines = inputEl.value.split(/\n/).length;
+      inStatus.innerHTML = `<span class=\"pill\">${lines} lines</span><span class=\"pill\">${len} chars</span>`;
+    };
+    inputEl.addEventListener('input', updateInStatus);
+
+    // Shortcuts
+    document.addEventListener('keydown', (e) => {
+      const meta = e.ctrlKey || e.metaKey;
+      if (meta && e.key.toLowerCase() === 'b') { e.preventDefault(); doRepair(true); }
+      if (meta && e.key.toLowerCase() === 'm') { e.preventDefault(); $('#btnMin').click(); }
+    });
+
+    function flash(msg) {
+      const n = document.createElement('div');
+      n.textContent = msg;
+      n.style.position = 'fixed';
+      n.style.right = '16px';
+      n.style.bottom = '16px';
+      n.style.padding = '10px 12px';
+      n.style.background = 'linear-gradient(180deg, rgba(91,156,255,.35), rgba(25,65,135,.35))';
+      n.style.border = '1px solid rgba(91,156,255,.5)';
+      n.style.borderRadius = '10px';
+      n.style.zIndex = 9999;
+      document.body.appendChild(n);
+      setTimeout(() => n.remove(), 1200);
+    }
+
+    // Initial sample (optional)
+    inputEl.value = '';
+    updateInStatus();
+  </script>
+</body>
 </html>
