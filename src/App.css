@@ -79,8 +79,8 @@ body {
   flex: 1 1 auto; 
 }
 
-/* Buttons */
-.btn { 
+/* Buttons and Interactive Elements */
+.btn, .dropdown-toggle {
   background: rgba(255, 255, 255, 0.08); 
   border: 1px solid var(--border); 
   color: var(--text); 
@@ -192,16 +192,16 @@ body {
 
 .btn:hover { 
   background: rgba(255, 255, 255, 0.12); 
-  border-color: #2a3a4d; 
+  border-color: var(--accent); 
   transform: translateY(-1px); 
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 12px rgba(91, 156, 255, 0.2);
 }
 
 .btn:active {
   transform: translateY(0);
   background: rgba(255, 255, 255, 0.16);
-  border-color: #2a3a4d;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  border-color: var(--accent);
+  box-shadow: 0 2px 6px rgba(91, 156, 255, 0.15);
 }
 
 .btn.good { 
@@ -268,6 +268,28 @@ pre.pretty {
   min-height: 36px;
   align-items: center;
   background: rgba(255, 255, 255, 0.02);
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: nowrap;
+  flex-wrap: nowrap;
+}
+
+/* Custom scrollbar for status pills */
+.status::-webkit-scrollbar {
+  height: 4px;
+}
+
+.status::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.status::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+}
+
+.status::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
 }
 
 /* Ensure consistent footer height for panes */
@@ -288,6 +310,8 @@ pre.pretty {
   gap: 4px;
   min-height: 20px;
   line-height: 1;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .pill.error {

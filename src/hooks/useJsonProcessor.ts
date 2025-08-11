@@ -21,17 +21,21 @@ export function useJsonProcessor(liveMode: boolean) {
     }
   }, [])
 
-  // Save input to localStorage whenever it changes
+  // Save input to localStorage with debouncing
   useEffect(() => {
-    try {
-      if (inputValue.trim()) {
-        localStorage.setItem(INPUT_STORAGE_KEY, inputValue)
-      } else {
-        localStorage.removeItem(INPUT_STORAGE_KEY)
+    const saveTimer = setTimeout(() => {
+      try {
+        if (inputValue.trim()) {
+          localStorage.setItem(INPUT_STORAGE_KEY, inputValue)
+        } else {
+          localStorage.removeItem(INPUT_STORAGE_KEY)
+        }
+      } catch {
+        // Ignore localStorage errors
       }
-    } catch {
-      // Ignore localStorage errors
-    }
+    }, 500) // Debounce localStorage writes
+
+    return () => clearTimeout(saveTimer)
   }, [inputValue])
 
   const processInput = useCallback((text: string) => {
@@ -55,34 +59,28 @@ export function useJsonProcessor(liveMode: boolean) {
     }
   }, [])
 
-  // Live processing with debouncing
+  // Live processing with optimized debouncing
   useEffect(() => {
-    if (!inputValue.trim()) {
+    // Clear timer if input is empty or live mode is disabled
+    if (!inputValue.trim() || !liveMode) {
       if (liveTimerRef.current) {
         clearTimeout(liveTimerRef.current)
         liveTimerRef.current = null
       }
-      // Clear processed result when input is empty
-      setProcessedResult(null)
-      return
-    }
-
-    // Only auto-process if live mode is enabled
-    if (!liveMode) {
-      if (liveTimerRef.current) {
-        clearTimeout(liveTimerRef.current)
-        liveTimerRef.current = null
+      
+      if (!inputValue.trim()) {
+        setProcessedResult(null)
       }
       return
     }
 
+    // Debounce processing
     if (liveTimerRef.current) {
       clearTimeout(liveTimerRef.current)
     }
 
     liveTimerRef.current = setTimeout(() => {
-      const result = processInput(inputValue)
-      setProcessedResult(result)
+      processInput(inputValue)
     }, 120)
 
     return () => {
@@ -116,58 +114,120 @@ function safeParse(text: string): JsonParseResult {
 
   const before = performance.now()
   
-  // First, try to detect errors in the original text for better positioning
-  const originalError = detectOriginalJsonErrors(text)
+  // Check if input contains common JSON syntax issues that need repair
+  const needsRepair = /0[1-9]|\.\d+|\d+\.|\b(NaN|Infinity|undefined|0x[0-9a-fA-F]+|0b[01]+|0o[0-7]+)\b|\d+[eE]/.test(text)
   
-  const cleaned = repairJson(text)
-  
-  try {
-    const obj = JSON.parse(cleaned)
-    const after = performance.now()
-    return { 
-      ok: true, 
-      obj, 
-      cleaned, 
-      ms: parseFloat((after - before).toFixed(1)) 
-    }
-  } catch (e: any) {
-    // Check if this error can be auto-fixed by trying to repair it again
-    const doubleCleaned = repairJson(cleaned)
+  // If input needs repair, skip the initial parse attempt
+  if (needsRepair) {
+    const cleaned = repairJson(text)
+    
     try {
-      JSON.parse(doubleCleaned)
-      // If it can be auto-fixed, don't show it as an error
+      const obj = JSON.parse(cleaned)
+      const after = performance.now()
       return { 
         ok: true, 
-        obj: JSON.parse(doubleCleaned), 
-        cleaned: doubleCleaned, 
-        ms: parseFloat((performance.now() - before).toFixed(1)) 
+        obj, 
+        cleaned, 
+        ms: parseFloat((after - before).toFixed(1)) 
       }
-    } catch (secondError: any) {
-      // This error requires manual intervention
-      // Use the original error detection if available, otherwise fall back to the old method
-      if (originalError) {
+    } catch (repairedError: any) {
+      const after = performance.now()
+      
+      // Try to detect errors in the original text for better positioning
+      const originalErrorInfo = detectOriginalJsonErrors(text)
+      
+      if (originalErrorInfo) {
         return { 
           ok: false, 
-          error: originalError.error || secondError?.message || 'Unknown error', 
-          cleaned: doubleCleaned, 
-          pos: originalError.pos || undefined, 
-          line: originalError.line || undefined, 
-          col: originalError.col || undefined,
-          token: originalError.token || undefined
+          error: originalErrorInfo.error || repairedError.message || 'Unknown error', 
+          cleaned, 
+          pos: originalErrorInfo.pos || undefined, 
+          line: originalErrorInfo.line || undefined, 
+          col: originalErrorInfo.col || undefined,
+          token: originalErrorInfo.token || undefined,
+          ms: parseFloat((after - before).toFixed(1)) 
         }
       } else {
-        // Fallback to old error detection method
-        const result = locateJsonError(secondError?.message, doubleCleaned)
+        // Fallback to error detection from repaired text
+        const result = locateJsonError(repairedError.message, cleaned)
         return { 
           ok: false, 
-          error: secondError?.message || 'Unknown error', 
-          cleaned: doubleCleaned, 
+          error: repairedError.message, 
+          cleaned, 
           pos: result.pos || undefined, 
           line: result.line || undefined, 
           col: result.col || undefined,
-          token: result.token || undefined
+          token: result.token || undefined,
+          ms: parseFloat((after - before).toFixed(1)) 
         }
       }
     }
   }
-} 
+  
+  // Otherwise, try to parse the original text first
+  try {
+    const obj = JSON.parse(text)
+    const after = performance.now()
+    return { 
+      ok: true, 
+      obj, 
+      cleaned: text, // Return original text as cleaned since no repair was needed
+      ms: parseFloat((after - before).toFixed(1)) 
+    }
+  } catch (originalError: any) {
+    // Original text is not valid JSON, proceed with repair
+    const cleaned = repairJson(text)
+    
+    try {
+      const obj = JSON.parse(cleaned)
+      const after = performance.now()
+      return { 
+        ok: true, 
+        obj, 
+        cleaned, 
+        ms: parseFloat((after - before).toFixed(1)) 
+      }
+    } catch (e: any) {
+      // Check if this error can be auto-fixed by trying to repair it again
+      const doubleCleaned = repairJson(cleaned)
+      try {
+        JSON.parse(doubleCleaned)
+        // If it can be auto-fixed, don't show it as an error
+        return { 
+          ok: true, 
+          obj: JSON.parse(doubleCleaned), 
+          cleaned: doubleCleaned, 
+          ms: parseFloat((performance.now() - before).toFixed(1)) 
+        }
+      } catch (secondError: any) {
+        // This error requires manual intervention
+        // Try to detect errors in the original text for better positioning
+        const originalErrorInfo = detectOriginalJsonErrors(text)
+        
+        if (originalErrorInfo) {
+          return { 
+            ok: false, 
+            error: originalErrorInfo.error || secondError?.message || 'Unknown error', 
+            cleaned: doubleCleaned, 
+            pos: originalErrorInfo.pos || undefined, 
+            line: originalErrorInfo.line || undefined, 
+            col: originalErrorInfo.col || undefined,
+            token: originalErrorInfo.token || undefined
+          }
+        } else {
+          // Fallback to old error detection method
+          const result = locateJsonError(secondError?.message, doubleCleaned)
+          return { 
+            ok: false, 
+            error: secondError?.message || 'Unknown error', 
+            cleaned: doubleCleaned, 
+            pos: result.pos || undefined, 
+            line: result.line || undefined, 
+            col: result.col || undefined,
+            token: result.token || undefined
+          }
+        }
+      }
+    }
+  }
+}

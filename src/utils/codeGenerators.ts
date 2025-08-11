@@ -55,50 +55,36 @@ function formatKey(key: string, language: 'python' | 'php' | 'ruby' | 'go' | 'ru
   return `"${key}"`
 }
 
-// Helper function to format values based on language conventions
+// Language-specific value mappings for better performance
+const LANGUAGE_MAPPINGS = {
+  null: {
+    python: 'None',
+    ruby: 'nil',
+    go: 'nil',
+    rust: 'None',
+    swift: 'nil',
+    c: 'NULL',
+    cpp: 'nullptr',
+    default: 'null'
+  },
+  boolean: {
+    python: { true: 'True', false: 'False' },
+    c: { true: '1', false: '0' },
+    default: { true: 'true', false: 'false' }
+  }
+} as const
+
+// Helper function to format values based on language conventions - optimized
 function formatValue(value: any, language: string, level: number = 0, options: CodeGeneratorOptions = {}): string {
   const indent = createIndent(level, options)
   
   if (value === null) {
-    switch (language) {
-      case 'python': return 'None'
-      case 'php': return 'null'
-      case 'ruby': return 'nil'
-      case 'go': return 'nil'
-      case 'rust': return 'None'
-      case 'kotlin': return 'null'
-      case 'swift': return 'nil'
-      case 'scala': return 'null'
-      case 'dart': return 'null'
-      case 'csharp': return 'null'
-      case 'java': return 'null'
-      case 'typescript': return 'null'
-      case 'javascript': return 'null'
-      case 'c': return 'NULL'
-      case 'cpp': return 'nullptr'
-      default: return 'null'
-    }
+    return LANGUAGE_MAPPINGS.null[language as keyof typeof LANGUAGE_MAPPINGS.null] || LANGUAGE_MAPPINGS.null.default
   }
   
   if (typeof value === 'boolean') {
-    switch (language) {
-      case 'python': return value ? 'True' : 'False'
-      case 'php': return value ? 'true' : 'false'
-      case 'ruby': return value ? 'true' : 'false'
-      case 'go': return value ? 'true' : 'false'
-      case 'rust': return value ? 'true' : 'false'
-      case 'kotlin': return value ? 'true' : 'false'
-      case 'swift': return value ? 'true' : 'false'
-      case 'scala': return value ? 'true' : 'false'
-      case 'dart': return value ? 'true' : 'false'
-      case 'csharp': return value ? 'true' : 'false'
-      case 'java': return value ? 'true' : 'false'
-      case 'typescript': return value ? 'true' : 'false'
-      case 'javascript': return value ? 'true' : 'false'
-      case 'c': return value ? '1' : '0'
-      case 'cpp': return value ? 'true' : 'false'
-      default: return value ? 'true' : 'false'
-    }
+    const boolMapping = LANGUAGE_MAPPINGS.boolean[language as keyof typeof LANGUAGE_MAPPINGS.boolean] || LANGUAGE_MAPPINGS.boolean.default
+    return boolMapping[value ? 'true' : 'false']
   }
   
   if (typeof value === 'string') {

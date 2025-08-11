@@ -1,35 +1,44 @@
 export function repairJson(text: string): string {
   if (!text) return ''
+  
+  // Pre-compile regex patterns for better performance
+  const commentPatterns = [
+    /\/\*[\s\S]*?\*\//g,           // Block comments
+    /(^|[^:])\/\/.*$/gm,           // Line comments (not URLs)
+    /#.*$/gm,                       // Hash comments
+    /;.*$/gm,                       // Semicolon comments
+    /^\s*[\r\n]/gm                  // Empty lines after comment removal
+  ]
+  
   let s = text
+  
+  // Apply all comment removal patterns efficiently
+  commentPatterns.forEach(pattern => {
+    s = s.replace(pattern, '')
+  })
 
-  // 1. Strip comments (but not URLs)
-  // Block comments: /* ... */
-  s = s.replace(/\/\*[\s\S]*?\*\//g, '')
-  // Line comments: // ... (but not URLs like http://...)
-  s = s.replace(/(^|[^:])\/\/.*$/gm, '$1')
-  // Hash comments: # ... (Python, Ruby, shell, etc.)
-  s = s.replace(/#.*$/gm, '')
-  // Semicolon comments: ; ... (INI files, some config formats)
-  s = s.replace(/;.*$/gm, '')
-  // Remove empty lines that might be left after comment removal
-  s = s.replace(/^\s*[\r\n]/gm, '')
-
-  // 2. Quote unquoted keys and values
-  // Quote unquoted object keys
-  s = s.replace(/([,{]\s*)([A-Za-z_][\w-]*)(\s*:)/g, '$1"$2"$3')
+  // 2. Quote unquoted keys and values - optimized patterns
+  // Only quote values that are NOT already quoted
+  const unquotedPatterns = [
+    [/([,{]\s*)([A-Za-z_][\w-]*)(\s*:)/g, '$1"$2"$3'],           // Object keys
+    [/(:\s*)(?!")([A-Za-z_][\w-]*)(\s*[,}])/g, '$1"$2"$3'],      // String values before commas/braces (not already quoted)
+    [/(:\s*)(?!")([A-Za-z_][\w-]*)(\s*$)/gm, '$1"$2"'],          // String values at end (not already quoted)
+    [/([\[,]\s*)(?!")([A-Za-z_][\w-]*)(\s*[,}\]])/g, '$1"$2"$3'], // Array items (not already quoted)
+    [/([\[,]\s*)(?!")([A-Za-z_][\w-]*)(\s*$)/gm, '$1"$2"']       // Array items at end (not already quoted)
+  ]
   
-  // Quote unquoted string values (after colons, before commas/braces)
-  s = s.replace(/(:\s*)([A-Za-z_][\w-]*)(\s*[,}])/g, '$1"$2"$3')
+  // First, check if the input is already valid JSON to avoid unnecessary processing
+  try {
+    JSON.parse(text)
+    // If it's already valid JSON, return it unchanged
+    return text
+  } catch {
+    // Not valid JSON, proceed with repair
+  }
   
-    // Handle unquoted values at the end of objects/arrays
-  s = s.replace(/(:\s*)([A-Za-z_][\w-]*)(\s*$)/gm, '$1"$2"')
-  
-  // Additional comprehensive unquoted string detection
-  // Handle unquoted strings in arrays: [item1, item2, item3]
-  s = s.replace(/([\[,]\s*)([A-Za-z_][\w-]*)(\s*[,}\]])/g, '$1"$2"$3')
-  
-  // Handle unquoted strings at array ends: [item1, item2]
-  s = s.replace(/([\[,]\s*)([A-Za-z_][\w-]*)(\s*$)/gm, '$1"$2"')
+  unquotedPatterns.forEach(([pattern, replacement]) => {
+    s = s.replace(pattern as RegExp, replacement as string)
+  })
   
   // 3. Convert single → double quotes
   // Use a more robust approach that correctly handles escaped characters
@@ -61,53 +70,73 @@ export function repairJson(text: string): string {
     }
   }
 
-  // 4. Replace True/False/None → true/false/null
-  s = s
-    .replace(/\bTrue\b/g, 'true')
-    .replace(/\bFalse\b/g, 'false')
-    .replace(/\bNone\b/g, 'null')
-
-  // 5. Fix numeric forms
-  // \b0(\d+) → $1 (remove leading zero from non-decimal numbers)
-  s = s.replace(/\b0(\d+)/g, '$1')
+  // 4. Replace True/False/None → true/false/null - optimized
+  const booleanPatterns = [
+    [/\bTrue\b/g, 'true'],
+    [/\bFalse\b/g, 'false'],
+    [/\bNone\b/g, 'null']
+  ]
   
-  // (?<![\d])\.(\d+) → 0.$1 (add leading zero to decimal numbers)
-  s = s.replace(/(?<!\d)\.(\d+)/g, '0.$1')
-  
-  // (\d+)\.(?=[^\d]) → $1.0 (add trailing zero to decimal numbers)
-  s = s.replace(/(\d+)\.(?=[^\d])/g, '$1.0')
+  booleanPatterns.forEach(([pattern, replacement]) => {
+    s = s.replace(pattern as RegExp, replacement as string)
+  })
 
-  // 6. Replace NaN|Infinity|-Infinity with null
-  s = s
-    .replace(/\bNaN\b/g, 'null')
-    .replace(/\bInfinity\b/g, 'null')
-    .replace(/\b-Infinity\b/g, 'null')
-    .replace(/\bundefined\b/g, 'null')
-
-  // 7. Remove trailing commas and clean up invalid patterns
-  // Remove trailing commas in objects/arrays
-  s = s.replace(/,\s*([}\]])/g, '$1')
-  // Remove trailing commas followed by invalid characters
-  s = s.replace(/,\s*[=;]/g, '')
-  // Trim dangling commas at end of input
-  s = s.replace(/,\s*$/, '')
+      // 5. Replace invalid values with null FIRST - before numeric fixes
+  s = s.replace(/-Infinity/g, 'null')  // Handle -Infinity FIRST (before Infinity)
+  s = s.replace(/\bNaN\b/g, 'null')
+  s = s.replace(/\bInfinity\b/g, 'null')
+  s = s.replace(/\bundefined\b/g, 'null')
+  s = s.replace(/\b0x[0-9a-fA-F]+\b/g, 'null')
+  s = s.replace(/\b0b[01]+\b/g, 'null')
+  s = s.replace(/\b0o[0-7]+\b/g, 'null')
   
-  // 8. Fix missing commas between objects/properties
-  // Add missing comma after closing bracket followed by property: "] property:"
-  s = s.replace(/(\s*)\]\s*(\s*[a-zA-Z_][a-zA-Z0-9_]*\s*:)/g, '$1],$2')
-  // Add missing comma after closing brace followed by property: "} property:"
-  s = s.replace(/(\s*)\}\s*(\s*[a-zA-Z_][a-zA-Z0-9_]*\s*:)/g, '$1},$2')
-  // Add missing comma after closing bracket followed by opening brace: "] {"
-  s = s.replace(/(\s*)\]\s*(\s*\{)/g, '$1],$2')
-  // Add missing comma after closing brace followed by opening bracket: "} ["
-  s = s.replace(/(\s*)\}\s*(\s*\[)/g, '$1},$2')
+  // 6. Simple, targeted numeric fixes - one pattern at a time
+  
+  // Fix leading zeros: "01" -> "1" (only after colons)
+  s = s.replace(/(:\s*)0([1-9]\d*)/g, '$1$2')
+  
+  // Fix leading decimals: ".5" -> "0.5" (only after colons)
+  s = s.replace(/(:\s*)\.(\d+)/g, '$10.$2')
+  
+  // Fix trailing decimals: "5." -> "5.0" (before commas/braces)
+  s = s.replace(/(\d+)\.(?=\s*[,}\]])/g, '$1.0')
+  
+  // Fix incomplete scientific notation: "1e" -> "1" (before commas/braces)
+  s = s.replace(/(\d+)e(?=\s*[,}\]])/g, '$1')
+  s = s.replace(/(\d+)E(?=\s*[,}\]])/g, '$1')
+  
+  // 7. Clean up any quoted nulls that might have been created
+  s = s.replace(/"null"/g, 'null')
+  
+  // 8. Remove trailing commas and clean up invalid patterns - optimized
+  const commaCleanupPatterns = [
+    [/,\s*([}\]])/g, '$1'],                                    // Remove trailing commas in objects/arrays
+    [/,\s*[=;]/g, ''],                                          // Remove trailing commas followed by invalid characters
+    [/,\s*$/, '']                                               // Trim dangling commas at end of input
+  ]
+  
+  commaCleanupPatterns.forEach(([pattern, replacement]) => {
+    s = s.replace(pattern as RegExp, replacement as string)
+  })
+  
+    // 9. Fix missing commas between objects/properties - optimized
+  const missingCommaPatterns = [
+    [/(\s*)\]\s*(\s*[a-zA-Z_][a-zA-Z0-9_]*\s*:)/g, '$1],$2'],  // "] property:"
+    [/(\s*)\}\s*(\s*[a-zA-Z_][a-zA-Z0-9_]*\s*:)/g, '$1},$2'],  // "} property:"
+    [/(\s*)\]\s*(\s*\{)/g, '$1],$2'],                           // "] {"
+    [/(\s*)\}\s*(\s*\[)/g, '$1},$2']                            // "} ["
+  ]
+  
+  missingCommaPatterns.forEach(([pattern, replacement]) => {
+    s = s.replace(pattern as RegExp, replacement as string)
+  })
 
   // Normalize Unicode quotes → straight quotes
   s = s.replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"')
 
   // Remove BOM
   s = s.replace(/^\uFEFF/, '')
-
+  
   return s.trim()
 }
 
@@ -124,15 +153,12 @@ export function detectOriginalJsonErrors(text: string): {
 } | null {
   if (!text) return null
   
-  console.log('🔍 detectOriginalJsonErrors: scanning original text for structural errors')
-  
   // First, try to parse the original text to see what error we get
   try {
     JSON.parse(text)
     return null // No errors found
   } catch (e: any) {
     const errorMsg = e.message || 'Unknown error'
-    console.log('🔍 Original text parse error:', errorMsg)
     
     // Look for structural patterns that commonly cause JSON errors
     const lines = text.split('\n')
@@ -148,7 +174,6 @@ export function detectOriginalJsonErrors(text: string): {
       const doubleCommaMatch = line.match(/([^,]),,/)
       if (doubleCommaMatch) {
         const pos = lines.slice(0, lineNum).join('\n').length + line.indexOf(',,') + 1
-        console.log('🔍 Found double comma at:', { line: lineNum + 1, col: line.indexOf(',,') + 2, pos })
         return {
           pos,
           line: lineNum + 1,
@@ -163,7 +188,6 @@ export function detectOriginalJsonErrors(text: string): {
       const trailingCommaSameLine = line.match(/,\s*([}\]])/)
       if (trailingCommaSameLine) {
         const pos = lines.slice(0, lineNum).join('\n').length + line.indexOf(',')
-        console.log('🔍 Found trailing comma on same line at:', { line: lineNum + 1, col: line.indexOf(',') + 1, pos })
         return {
           pos,
           line: lineNum + 1,
@@ -180,7 +204,6 @@ export function detectOriginalJsonErrors(text: string): {
         const nextLine = lines[lineNum + 1]
         if (nextLine && nextLine.trim().match(/^[a-zA-Z_][a-zA-Z0-9_]*\s*:/)) {
           const pos = lines.slice(0, lineNum).join('\n').length + line.length
-          console.log('🔍 Found missing comma after brace at:', { line: lineNum + 1, col: line.length + 1, pos })
           return {
             pos,
             line: lineNum + 1,
@@ -197,7 +220,6 @@ export function detectOriginalJsonErrors(text: string): {
         const nextLine = lines[lineNum + 1]
         if (nextLine && nextLine.trim().match(/^[a-zA-Z_][a-zA-Z0-9_]*\s*:/)) {
           const pos = lines.slice(0, lineNum).join('\n').length + line.length
-          console.log('🔍 Found missing comma after bracket at:', { line: lineNum + 1, col: line.length + 1, pos })
           return {
             pos,
             line: lineNum + 1,
@@ -214,7 +236,6 @@ export function detectOriginalJsonErrors(text: string): {
         const nextLine = lines[lineNum + 1]
         if (nextLine && nextLine.trim().match(/^[a-zA-Z_][a-zA-Z0-9_]*\s*:/)) {
           const pos = lines.slice(0, lineNum).join('\n').length + line.length
-          console.log('🔍 Found missing comma after value at:', { line: lineNum + 1, col: line.length + 1, pos })
           return {
             pos,
             line: lineNum + 1,
@@ -239,7 +260,6 @@ export function detectOriginalJsonErrors(text: string): {
         }
         if (braceCount > 0) {
           const pos = lines.slice(0, lineNum).join('\n').length + line.length
-          console.log('🔍 Found unclosed brace at:', { line: lineNum + 1, col: line.length, pos })
           return {
             pos,
             line: lineNum + 1,
@@ -262,7 +282,6 @@ export function detectOriginalJsonErrors(text: string): {
         }
         if (bracketCount > 0) {
           const pos = lines.slice(0, lineNum).join('\n').length + line.length
-          console.log('🔍 Found unclosed bracket at:', { line: lineNum + 1, col: line.length, pos })
           return {
             pos,
             line: lineNum + 1,
@@ -279,11 +298,25 @@ export function detectOriginalJsonErrors(text: string): {
     if (errorMsg.includes('Unexpected token') || errorMsg.includes('Unexpected end') || 
         errorMsg.includes('Unexpected number') || errorMsg.includes('Unexpected string')) {
       const fallbackResult = locateJsonError(errorMsg, text)
+      
+      // Only return error info if we can reliably locate the position
+      if (fallbackResult.pos !== null && fallbackResult.line !== null && fallbackResult.col !== null) {
+        return {
+          pos: fallbackResult.pos,
+          line: fallbackResult.line,
+          col: fallbackResult.col,
+          token: fallbackResult.token,
+          error: errorMsg
+        }
+      }
+      
+      // If we can't locate the position reliably, just return the error message without position info
+      // This prevents showing misleading error markers
       return {
-        pos: fallbackResult.pos,
-        line: fallbackResult.line,
-        col: fallbackResult.col,
-        token: fallbackResult.token,
+        pos: null,
+        line: null,
+        col: null,
+        token: null,
         error: errorMsg
       }
     }
@@ -299,7 +332,6 @@ export function locateJsonError(msg: string, text: string): {
   col: number | null
   token: string | null
 } {
-  console.log('🔍 locateJsonError called with:', { msg: msg.substring(0, 100), textLength: text.length })
   // Try multiple regex patterns to find error position
   const patterns = [
     /at position (\d+)/,
@@ -332,189 +364,38 @@ export function locateJsonError(msg: string, text: string): {
   }
   
   if (pos == null || isNaN(pos)) {
-    console.log('🔍 No position found, using fallback scanning')
-    // Fallback: try to find the first problematic character
-    return findFirstProblematicChar(text)
+    // No position found - don't show misleading markers
+    // Return null to indicate we can't reliably locate the error
+    return { pos: null, line: null, col: null, token: null }
   }
   
+  // Validate position is within text bounds
   pos = Math.max(0, Math.min(text.length - 1, pos))
-  
-  console.log('🔍 Parsed position:', { pos, charAtPos: text.charAt(pos) })
-  console.log('🔍 Text around position:', text.substring(Math.max(0, pos - 10), pos + 10))
-  
-  // Debug: let's see what's at position 890 specifically
-  if (pos === 890) {
-    console.log('🔍 DEBUG: Position 890 analysis:')
-    console.log('🔍 Character at 890:', text.charAt(890))
-    console.log('🔍 Character at 889:', text.charAt(889))
-    console.log('🔍 Character at 891:', text.charAt(891))
-    console.log('🔍 Context around 890:', text.substring(885, 895))
-  }
   
   // Use a simple, reliable line/column calculation
   const lines = text.split('\n')
   let currentPos = 0
   
-  console.log('🔍 Line calculation debug:')
   for (let i = 0; i < lines.length; i++) {
     const lineLength = lines[i].length
-    const lineEndPos = currentPos + lineLength
-    console.log(`🔍 Line ${i + 1}: length=${lineLength}, currentPos=${currentPos}, lineEndPos=${lineEndPos}, pos=${pos}`)
     
     if (currentPos + lineLength >= pos) {
       const line = i + 1
       const col = pos - currentPos + 1
-      console.log('🔍 Final calculation:', { pos, line, col, charAtPos: text.charAt(pos) })
-      return { pos, line, col, token }
+      
+      // Validate that the calculated position makes sense
+      if (col > 0 && col <= lineLength + 1) {
+        return { pos, line, col, token }
+      } else {
+        // Invalid column calculation - don't show misleading markers
+        return { pos: null, line: null, col: null, token: null }
+      }
     }
     currentPos += lineLength + 1 // +1 for newline
   }
   
-  // Fallback if we somehow didn't find the line
-  console.log('🔍 Fallback calculation failed, using original')
-  return { pos, line: 1, col: 1, token }
-}
-
-function findFirstProblematicChar(text: string): {
-  pos: number | null
-  line: number | null
-  col: number | null
-  token: string | null
-} {
-  if (!text) return { pos: null, line: null, col: null, token: null }
-  
-  console.log('🔍 Scanning for problematic characters in text...')
-  
-  // First, check for missing commas (higher priority as they're more common)
-  const missingComma = findMissingCommas(text)
-  if (missingComma) {
-    console.log('🔍 Found missing comma:', missingComma)
-    return missingComma
-  }
-  
-  console.log('🔍 No missing commas found, checking for invalid characters...')
-  
-  // Look for common JSON syntax issues
-  const lines = text.split('\n')
-  for (let lineNum = 0; lineNum < lines.length; lineNum++) {
-    const line = lines[lineNum]
-    const trimmed = line.trim()
-    
-    // Skip empty lines and comment lines
-    if (!trimmed || trimmed.startsWith('//') || trimmed.startsWith('#')) continue
-    
-    // Look for invalid characters that cause JSON parse errors
-    for (let col = 0; col < line.length; col++) {
-      const char = line[col]
-      
-      // Check for invalid JSON characters
-      if (/[=;]/.test(char)) {
-        // Calculate the actual position in the text
-        let pos = 0
-        for (let i = 0; i < lineNum; i++) {
-          pos += lines[i].length + 1 // +1 for newline
-        }
-        pos += col
-        console.log('🔍 Found invalid character:', { char, line: lineNum + 1, col: col + 1, pos })
-        return { pos, line: lineNum + 1, col: col + 1, token: char }
-      }
-      
-      // Check for other invalid characters that commonly cause issues
-      if (/[<>|&%$@!]/.test(char)) {
-        // Calculate the actual position in the text
-        let pos = 0
-        for (let i = 0; i < lineNum; i++) {
-          pos += lines[i].length + 1 // +1 for newline
-        }
-        pos += col
-        return { pos, line: lineNum + 1, col: col + 1, token: char }
-      }
-      
-        // Check for unquoted keys
-  if (char === ':' && col > 0) {
-    let keyStart = col - 1
-    while (keyStart >= 0 && /\s/.test(line[keyStart])) keyStart--
-    if (keyStart >= 0 && /[a-zA-Z0-9_]*/.test(line.substring(keyStart, col).trim())) {
-      // Calculate the actual position in the text
-      let pos = 0
-      for (let i = 0; i < lineNum; i++) {
-        pos += lines[i].length + 1 // +1 for newline
-      }
-      pos += col
-      return { pos, line: lineNum + 1, col: col + 1, token: null }
-    }
-  }
-    }
-  }
-  
+  // Fallback if we somehow didn't find the line - don't show misleading markers
   return { pos: null, line: null, col: null, token: null }
-}
-
-/**
- * Detect missing commas between objects and properties
- * @param text The full text content
- * @returns Information about missing commas if found
- */
-function findMissingCommas(text: string): {
-  pos: number | null
-  line: number | null
-  col: number | null
-  token: string | null
-} | null {
-  console.log('🔍 findMissingCommas: scanning', text.split('\n').length, 'lines')
-  const lines = text.split('\n')
-  
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]
-    const nextLine = lines[i + 1]
-    
-    if (!line || !nextLine) continue
-    
-    console.log(`🔍 Checking line ${i + 1}: "${line.trim()}" -> "${nextLine.trim()}"`)
-    
-    // Look for patterns like "} property:" (missing comma after closing brace)
-    const missingCommaAfterBrace = line.match(/(\s*)\}(\s*)$/)
-    if (missingCommaAfterBrace && nextLine.match(/^\s*[a-zA-Z_][a-zA-Z0-9_]*\s*:/)) {
-      // Found a closing brace followed by a property name - missing comma
-      const pos = lines.slice(0, i).join('\n').length + line.length
-      console.log('🔍 Found missing comma after brace:', { line: i + 1, nextLine: i + 2, pos })
-      return {
-        pos,
-        line: i + 1,
-        col: line.length + 1,
-        token: ','
-      }
-    }
-    
-    // Look for patterns like "] property:" (missing comma after closing bracket)
-    const missingCommaAfterBracket = line.match(/(\s*)\]\s*$/)
-    if (missingCommaAfterBracket && nextLine.match(/^\s*[a-zA-Z_][a-zA-Z0-9_]*\s*:/)) {
-      // Found a closing bracket followed by a property name - missing comma
-      const pos = lines.slice(0, i).join('\n').length + line.length
-      console.log('🔍 Found missing comma after bracket:', { line: i + 1, nextLine: i + 2, pos, lineContent: line.trim(), nextLineContent: nextLine.trim() })
-      return {
-        pos,
-        line: i + 1,
-        col: line.length + 1,
-        token: ','
-      }
-    }
-    
-    // Look for patterns like "value, property:" (missing comma after value)
-    const missingCommaAfterValue = line.match(/(\s*)([a-zA-Z0-9_]+|"[^"]*"|'[^']*'|true|false|null|None|True|False)\s*$/)
-    if (missingCommaAfterValue && nextLine.match(/^\s*[a-zA-Z_][a-zA-Z0-9_]*\s*:/)) {
-      // Found a value followed by a property name - missing comma
-      const pos = lines.slice(0, i).join('\n').length + line.length
-      return {
-        pos,
-        line: i + 1,
-        col: line.length + 1,
-        token: ','
-      }
-    }
-  }
-  
-  return null
 }
 
 /**

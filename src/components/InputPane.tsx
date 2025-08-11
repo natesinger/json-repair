@@ -40,29 +40,15 @@ const InputPane: React.FC<InputPaneProps> = ({
   // Use prop error info if available and has valid line/col, otherwise use local error info
   // Clear local error info if prop error info is null (JSON is valid)
   const errorInfo = (propErrorInfo && propErrorInfo.line && propErrorInfo.col) ? {
+    error: propErrorInfo.error,
     line: propErrorInfo.line,
     col: propErrorInfo.col,
     token: propErrorInfo.token
   } : (propErrorInfo === null ? null : localErrorInfo)
 
-  // Debug logging to see what's happening with error state
-  useEffect(() => {
-    console.log('=== Error State Debug ===')
-    console.log('propErrorInfo:', propErrorInfo)
-    console.log('localErrorInfo:', localErrorInfo)
-    console.log('final errorInfo:', errorInfo)
-    if (errorInfo) {
-      console.log('ErrorMarker will show at:', { line: errorInfo.line, col: errorInfo.col })
-    } else {
-      console.log('No error marker to show')
-    }
-    console.log('========================')
-  }, [errorInfo, propErrorInfo, localErrorInfo])
-
   // Clear local error info when prop error info becomes null (JSON is valid)
   useEffect(() => {
     if (propErrorInfo === null) {
-      console.log('Prop error info is null, clearing local error info')
       setLocalErrorInfo(null)
     }
   }, [propErrorInfo])
@@ -72,7 +58,6 @@ const InputPane: React.FC<InputPaneProps> = ({
     if (value.trim()) {
       try {
         JSON.parse(value)
-        console.log('Input value changed: JSON is valid, clearing localErrorInfo')
         setLocalErrorInfo(null)
       } catch (err) {
         // JSON is invalid, keep existing error info
@@ -87,89 +72,50 @@ const InputPane: React.FC<InputPaneProps> = ({
   
 
 
-  // Update line numbers
+  // Update line numbers - optimized version
   const updateLineNumbers = useCallback(() => {
-    // Get the actual logical lines (newline-separated)
+    if (!textareaRef.current) return
+    
     const logicalLines = value.split('\n')
-    const maxLogicalLines = Math.max(logicalLines.length, 1)
+    const textarea = textareaRef.current
+    const containerWidth = textarea.clientWidth - 24
+    const charsPerLine = Math.max(Math.floor(containerWidth / 8), 1) // Minimum 1 char per line
     
-    // Calculate how many visual lines each logical line takes up
-    let visualLineNumbers: number[] = []
+    const visualLineNumbers: number[] = []
     
-    for (let logicalLineNum = 1; logicalLineNum <= maxLogicalLines; logicalLineNum++) {
-      const logicalLine = logicalLines[logicalLineNum - 1] || ''
+    for (let i = 0; i < logicalLines.length; i++) {
+      const lineLength = logicalLines[i].length
+      const visualLines = Math.max(Math.ceil(lineLength / charsPerLine), 1)
       
-      // Calculate how many visual lines this logical line takes up
-      if (textareaRef.current) {
-        const textarea = textareaRef.current
-        
-        // Simplified approach - estimate wrapping based on character count and container width
-        // This avoids DOM manipulation entirely and prevents crashes
-        const estimatedCharsPerLine = Math.floor((textarea.clientWidth - 24) / 8) // Rough estimate: 8px per character
-        const estimatedLines = Math.ceil(logicalLine.length / estimatedCharsPerLine) || 1
-        
-        // Add the line number for each visual line (wrapped lines get the same number)
-        for (let visualLine = 1; visualLine <= estimatedLines; visualLine++) {
-          visualLineNumbers.push(logicalLineNum)
-        }
-      } else {
-        // Fallback: just show one line number per logical line
-        visualLineNumbers.push(logicalLineNum)
-      }
+      // Fill array with the same line number for wrapped lines
+      visualLineNumbers.push(...Array(visualLines).fill(i + 1))
     }
     
-    // Update React state instead of manipulating DOM directly
     setLineNumbers(visualLineNumbers)
   }, [value])
 
-  // Update input status (line count and character count)
+  // Update input status (line count and character count) - optimized
   const updateInputStatus = useCallback(() => {
     const len = value.length
-    const logicalLines = Math.max(value.split('\n').length, 1)
+    const logicalLines = value.length > 0 ? value.split('\n').length : 1
     
-    // Update React state instead of manipulating DOM directly
     setInputStatus({ lines: logicalLines, chars: len })
   }, [value])
 
-  // Update line numbers and status whenever value changes
-  useEffect(() => {
-    // Small delay to ensure DOM is ready
-    const timer = setTimeout(() => {
-      updateLineNumbers()
-      updateInputStatus()
-    }, 0)
-    return () => clearTimeout(timer)
-  }, [value, updateLineNumbers, updateInputStatus])
-
-  // Use MutationObserver to detect when content changes (including paste operations)
+  // Combined effect for updating line numbers and status
   useEffect(() => {
     if (!textareaRef.current) return
     
-    const observer = new MutationObserver(() => {
-      // When the textarea content changes, update line numbers
-      requestAnimationFrame(() => {
-        updateLineNumbers()
-      })
-    })
-    
-    observer.observe(textareaRef.current, {
-      childList: true,
-      subtree: true,
-      characterData: true
-    })
-    
-    return () => observer.disconnect()
-  }, [updateLineNumbers])
-
-  // Initial line numbers and status setup
-  useEffect(() => {
-    // Ensure line numbers and status are set up when component mounts
-    const timer = setTimeout(() => {
+    // Use requestAnimationFrame for better performance
+    const updateUI = () => {
       updateLineNumbers()
       updateInputStatus()
-    }, 0)
+    }
+    
+    // Debounce updates to avoid excessive recalculations
+    const timer = setTimeout(updateUI, 16) // ~60fps
     return () => clearTimeout(timer)
-  }, [updateLineNumbers, updateInputStatus])
+  }, [value, updateLineNumbers, updateInputStatus])
 
   // Global drag event prevention to stop browser from opening files
   useEffect(() => {
@@ -566,6 +512,11 @@ const InputPane: React.FC<InputPaneProps> = ({
         <span className="pill">{inputStatus.lines} lines</span>
         <span className="pill">{inputStatus.chars} chars</span>
         <div className="spacer"></div>
+        {errorInfo && 'error' in errorInfo && errorInfo.error && !errorInfo.line && !errorInfo.col && (
+          <span className="pill error" title={errorInfo.error}>
+            ⚠️ Parse Error
+          </span>
+        )}
         <span className="pill drag-hint-pill" title="Drag & drop files here">
           <span className="drag-hint-icon-small">📁</span>
           <span className="drag-hint-text-small">Drag files here</span>
@@ -708,19 +659,7 @@ const ErrorMarker: React.FC<ErrorMarkerProps> = React.memo(({ line, col, token, 
   }
   const left = lineNumbersWidth + (col - 1) * charWidth + paddingLeft - 3 // User's manual adjustment
   
-  // Debug logging for positioning
-  console.log('ErrorMarker positioning:', {
-    line,
-    col,
-    fontSize,
-    charWidth,
-    lineNumbersWidth,
-    paddingTop,
-    paddingLeft,
-    lineHeight,
-    top,
-    left
-  })
+  // Position calculated successfully
   
 
   

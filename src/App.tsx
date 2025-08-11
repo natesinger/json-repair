@@ -19,16 +19,27 @@ function App() {
     clearInput 
   } = useJsonProcessor(settings.live)
 
-  // Check screen size on mount and resize
+  // Check screen size on mount and resize - optimized
   useEffect(() => {
     const checkScreenSize = () => {
       setIsMobile(window.innerWidth < 768)
     }
     
     checkScreenSize()
-    window.addEventListener('resize', checkScreenSize)
     
-    return () => window.removeEventListener('resize', checkScreenSize)
+    // Debounce resize events for better performance
+    let resizeTimer: ReturnType<typeof setTimeout>
+    const handleResize = () => {
+      clearTimeout(resizeTimer)
+      resizeTimer = setTimeout(checkScreenSize, 100)
+    }
+    
+    window.addEventListener('resize', handleResize)
+    
+    return () => {
+      window.removeEventListener('resize', handleResize)
+      clearTimeout(resizeTimer)
+    }
   }, [])
 
   // Show mobile warning if screen is too small

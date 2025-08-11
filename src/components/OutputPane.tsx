@@ -18,126 +18,88 @@ const OutputPane: React.FC<OutputPaneProps> = ({ result, visualize, settings, on
   const [lineNumbers, setLineNumbers] = useState<number[]>([])
   const [outputStatus, setOutputStatus] = useState<{ lines: number; chars: number }>({ lines: 0, chars: 0 })
 
-  // Update line numbers
+  // Update line numbers - optimized version
   const updateLineNumbers = useCallback(() => {
     const outputEl = outputRef.current
-    
-    if (!outputEl) {
-      return
-    }
+    if (!outputEl) return
 
-    let contentText = ''
-
-    try {
-      if (!result) {
-        // No result - show placeholder content
-        setLineNumbers([1])
-        return
-      } else if (visualize) {
-        // For tree view, get the actual rendered content
-        const treeEl = outputEl.querySelector('.json-tree')
-        if (treeEl) {
-          // Try innerText first, fallback to textContent
-          contentText = (treeEl as HTMLElement).innerText || treeEl.textContent || ''
-        } else {
-          setLineNumbers([1])
-          return
-        }
-      } else {
-        // For JSON string, get the actual content
-        const preElement = outputEl.querySelector('pre.pretty')
-        if (preElement) {
-          // Try innerText first, fallback to textContent
-          contentText = (preElement as HTMLElement).innerText || preElement.textContent || ''
-        } else {
-          setLineNumbers([1])
-          return
-        }
-      }
-    } catch (err) {
-      // Fallback to safe content
-      contentText = ''
+    // If minified, always show single line
+    if (settings.minify) {
       setLineNumbers([1])
       return
     }
 
-    // Get the actual logical lines (newline-separated) - exactly like input pane
+    // Get content text efficiently
+    let contentText = ''
+    try {
+      if (!result) {
+        setLineNumbers([1])
+        return
+      }
+      
+      if (visualize) {
+        const treeEl = outputEl.querySelector('.json-tree')
+        contentText = treeEl ? (treeEl as HTMLElement).innerText || treeEl.textContent || '' : ''
+      } else {
+        const preElement = outputEl.querySelector('pre.pretty')
+        contentText = preElement ? (preElement as HTMLElement).innerText || preElement.textContent || '' : ''
+      }
+      
+      if (!contentText) {
+        setLineNumbers([1])
+        return
+      }
+    } catch (err) {
+      setLineNumbers([1])
+      return
+    }
+
+    // Calculate visual lines efficiently
     const logicalLines = contentText.split('\n')
-    const maxLogicalLines = Math.max(logicalLines.length, 1)
-
-    // Calculate how many visual lines each logical line takes up
-    let visualLineNumbers: number[] = []
+    const containerWidth = outputEl.clientWidth - 24
+    const charsPerLine = Math.max(Math.floor(containerWidth / 8), 1)
     
-    // If minified, we only have one line regardless of content
-    if (settings.minify) {
-      visualLineNumbers = [1]
-    } else {
-      for (let logicalLineNum = 1; logicalLineNum <= maxLogicalLines; logicalLineNum++) {
-        const logicalLine = logicalLines[logicalLineNum - 1] || ''
-        
-        // Calculate how many visual lines this logical line takes up
-        if (outputEl) {
-          
-          // Simplified approach - estimate wrapping based on character count and container width
-          // This avoids DOM manipulation entirely and prevents crashes
-          const estimatedCharsPerLine = Math.floor((outputEl.clientWidth - 24) / 8) // Rough estimate: 8px per character
-          const estimatedLines = Math.ceil(logicalLine.length / estimatedCharsPerLine) || 1
-          
-          // Calculate how many visual lines this logical line needs - exactly like input pane
-          const visualLinesForThisLine = estimatedLines
-          
-          // Add line numbers for each visual line
-          for (let visualLine = 1; visualLine <= visualLinesForThisLine; visualLine++) {
-            visualLineNumbers.push(logicalLineNum)
-          }
-        } else {
-          // Fallback: just show one line number per logical line
-          visualLineNumbers.push(logicalLineNum)
-        }
-      }
+    const visualLineNumbers: number[] = []
+    
+    for (let i = 0; i < logicalLines.length; i++) {
+      const lineLength = logicalLines[i].length
+      const visualLines = Math.max(Math.ceil(lineLength / charsPerLine), 1)
+      visualLineNumbers.push(...Array(visualLines).fill(i + 1))
     }
     
-    // Update React state instead of manipulating DOM directly
     setLineNumbers(visualLineNumbers)
-  }, [visualize, result, settings.minify])
+  }, [result, visualize, settings.minify])
 
-  // Update output status with line count
+  // Update output status with line count - optimized
   const updateOutputStatus = useCallback(() => {
-    const outputEl = outputRef.current
-    if (!outputEl) return
-
-    let lineCount = 0
-    let charCount = 0
-
     if (!result) {
-      // No result - show placeholder content
-      lineCount = 1
-      charCount = 0
-    } else if (visualize) {
-      const treeEl = outputEl.querySelector('.json-tree')
-      if (treeEl) {
-        const textContent = (treeEl as HTMLElement).innerText || treeEl.textContent || ''
-        // Use the same simple logic as input pane - just count newlines
-        lineCount = Math.max(textContent.split('\n').length, 1)
-        charCount = textContent.length
-      }
-    } else {
-      const preElement = outputEl.querySelector('pre.pretty')
-      if (preElement) {
-        const content = (preElement as HTMLElement).innerText || preElement.textContent || ''
-        // If minified, we always have 1 line
-        if (settings.minify) {
-          lineCount = 1
-        } else {
-          // Use the same simple logic as input pane - just count newlines
-          lineCount = Math.max(content.split('\n').length, 1)
-        }
-        charCount = content.length
-      }
+      setOutputStatus({ lines: 1, chars: 0 })
+      return
     }
 
-    // Update React state instead of manipulating DOM directly
-    setOutputStatus({ lines: lineCount, chars: charCount })
+    // Always calculate character count, even for minified content
+    let content = ''
+    try {
+      if (visualize) {
+        const treeEl = outputRef.current?.querySelector('.json-tree')
+        content = treeEl ? (treeEl as HTMLElement).innerText || treeEl.textContent || '' : ''
+      } else {
+        const preElement = outputRef.current?.querySelector('pre.pretty')
+        content = preElement ? (preElement as HTMLElement).innerText || preElement.textContent || '' : ''
+      }
+    } catch (err) {
+      setOutputStatus({ lines: 1, chars: 0 })
+      return
+    }
+
+    // For minified content, always show 1 line but keep character count
+    if (settings.minify) {
+      setOutputStatus({ lines: 1, chars: content.length })
+      return
+    }
+
+    const lines = content.length > 0 ? content.split('\n').length : 1
+    setOutputStatus({ lines, chars: content.length })
   }, [result, visualize, settings.minify])
 
   // Sync scroll between output content and line numbers
@@ -170,27 +132,21 @@ const OutputPane: React.FC<OutputPaneProps> = ({ result, visualize, settings, on
     }
   }, [handleScroll])
 
-  // Update line numbers and status when result, visualize, or minify changes
+  // Combined effect for updating line numbers and status
   useEffect(() => {
-    // Small delay to ensure DOM is ready
-    const timer = setTimeout(() => {
+    if (!outputRef.current) return
+    
+    // Use requestAnimationFrame for better performance
+    const updateUI = () => {
       updateLineNumbers()
       updateOutputStatus()
-      // Re-attach scroll listener after content changes
       attachScrollListener()
-    }, 0)
+    }
+    
+    // Debounce updates to avoid excessive recalculations
+    const timer = setTimeout(updateUI, 16) // ~60fps
     return () => clearTimeout(timer)
   }, [result, visualize, settings.minify, updateLineNumbers, updateOutputStatus, attachScrollListener])
-
-  // Initial line numbers setup
-  useEffect(() => {
-    // Ensure line numbers are set up when component mounts
-    const timer = setTimeout(() => {
-      updateLineNumbers()
-      updateOutputStatus()
-    }, 0)
-    return () => clearTimeout(timer)
-  }, [updateLineNumbers, updateOutputStatus])
 
   // Add scroll event listener to the actual scrollable content
   useEffect(() => {
