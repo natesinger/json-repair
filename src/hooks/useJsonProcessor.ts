@@ -7,7 +7,7 @@ const INPUT_STORAGE_KEY = 'jrInput:v1'
 export function useJsonProcessor(liveMode: boolean) {
   const [inputValue, setInputValue] = useState('')
   const [processedResult, setProcessedResult] = useState<ProcessedResult | null>(null)
-  const liveTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const liveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Load input from localStorage on mount
   useEffect(() => {

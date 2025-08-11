@@ -493,7 +493,6 @@ const ErrorMarker: React.FC<ErrorMarkerProps> = React.memo(({ line, col, token, 
   
   // Get the content up to the error line
   const lines = value.split('\n')
-  const linesBeforeError = lines.slice(0, line - 1)
   
   // Calculate top position (accounting for line wrapping and scroll position)
   let top = paddingTop

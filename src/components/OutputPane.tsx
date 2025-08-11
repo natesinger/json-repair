@@ -72,7 +72,6 @@ const OutputPane: React.FC<OutputPaneProps> = ({ result, visualize, settings, on
       
       // Calculate how many visual lines this logical line takes up
       if (outputEl) {
-        const lineHeight = 18 // Match the CSS line-height
         
         // Simplified approach - estimate wrapping based on character count and container width
         // This avoids DOM manipulation entirely and prevents crashes
@@ -208,7 +207,7 @@ const OutputPane: React.FC<OutputPaneProps> = ({ result, visualize, settings, on
     const outputEl = outputRef.current
     if (!outputEl) return
     
-    const observer = new MutationObserver((mutations) => {
+    const observer = new MutationObserver((_mutations) => {
       // When the output content changes, update line numbers and status
       requestAnimationFrame(() => {
         updateLineNumbers()

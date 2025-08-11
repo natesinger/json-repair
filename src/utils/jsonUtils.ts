@@ -345,7 +345,7 @@ export function getVisualLineNumber(text: string, logicalLine: number, container
   return visualLine
 }
 
-export function getErrorSuggestion(error: string, line?: number, col?: number): string {
+export function getErrorSuggestion(error: string, _line?: number, _col?: number): string {
   if (!error) return ''
   
   const errorLower = error.toLowerCase()

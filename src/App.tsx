@@ -1,4 +1,3 @@
-import React, { useState, useEffect } from 'react'
 import Header from './components/Header'
 import InputPane from './components/InputPane'
 import OutputPane from './components/OutputPane'
@@ -13,7 +12,6 @@ function App() {
     inputValue, 
     setInputValue, 
     processedResult, 
-    processInput, 
     processManual,
     clearInput 
   } = useJsonProcessor(settings.live)
