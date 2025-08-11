@@ -18,6 +18,6 @@
     "dev": "vite",
     "lint": "eslint .",
     "preview": "npm run build && vite preview",
-    "deploy": "echo \"# deploy script placeholder\""
+    "deploy": "wrangler deploy"
   }
 }
