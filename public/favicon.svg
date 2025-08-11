@@ -1,0 +1,48 @@
+<!-- /favicon.svg  (64x64 viewBox; scales cleanly to 16/32/48 px) -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Background: deep blue gradient with subtle vignette -->
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0B2A49"></stop>
+      <stop offset="1" stop-color="#0E3A66"></stop>
+    </linearGradient>
+    <radialGradient id="v" cx="50%" cy="40%" r="70%">
+      <stop offset="0" stop-color="#000" stop-opacity="0"></stop>
+      <stop offset="1" stop-color="#000" stop-opacity=".18"></stop>
+    </radialGradient>
+  </defs>
+
+  <!-- rounded square -->
+  <rect x="2" y="2" width="60" height="60" rx="12" fill="url(#g)"></rect>
+  <rect x="2" y="2" width="60" height="60" rx="12" fill="url(#v)"></rect>
+
+  <!-- Curly braces: drawn as paths (no font dependency) -->
+  <g fill="#FFF">
+    <!-- Left { -->
+    <path d="
+      M25,12
+      C18,12 18,20 14,22
+      C18,24 18,32 25,32
+      L25,36
+      C18,36 18,44 14,46
+      C18,48 18,56 25,56
+      L25,52
+      C21,50 22,44 26,42
+      L26,26
+      C22,24 21,18 25,16
+      Z"></path>
+    <!-- Right } (mirror of left) -->
+    <path d="
+      M39,12
+      C46,12 46,20 50,22
+      C46,24 46,32 39,32
+      L39,36
+      C46,36 46,44 50,46
+      C46,48 46,56 39,56
+      L39,52
+      C43,50 42,44 38,42
+      L38,26
+      C42,24 43,18 39,16
+      Z"></path>
+  </g>
+</svg>

@@ -1,0 +1,646 @@
+:root {
+  --bg: #0b0f14;
+  --panel: #121823;
+  --panel-2: #0f1520;
+  --text: #e6edf3;
+  --muted: #8b98a5;
+  --accent: #5b9cff;
+  --accent-2: #4cd1a1;
+  --error: #ff6b6b;
+  --border: #1f2a37;
+  --code: #d1e3ff;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+}
+
+html, body { 
+  height: 100%; 
+  overflow: hidden;
+}
+
+body {
+  margin: 0;
+  background: radial-gradient(1200px 1000px at 10% -10%, #0d1623, var(--bg)), var(--bg);
+  color: var(--text); 
+  font-family: var(--sans);
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* Always 50/50 split and prevent overflow from stretching columns */
+.wrap { 
+  flex: 1; 
+  display: grid; 
+  grid-template-columns: repeat(2, minmax(0, 1fr)); 
+  gap: 10px; 
+  padding: 10px; 
+  min-height: 0; 
+  overflow: hidden; 
+}
+
+/* Better pane styling */
+.pane {
+  background: linear-gradient(180deg, var(--panel), var(--panel-2)); 
+  border: 1px solid var(--border); 
+  border-radius: 14px; 
+  display: flex; 
+  flex-direction: column; 
+  min-height: 0; 
+  min-width: 0;
+  overflow: hidden;
+}
+
+.pane header { 
+  background: transparent; 
+  border: 0; 
+  padding: 0;
+  margin: 0;
+}
+
+/* Improve toolbar spacing */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.toolbar .spacer { 
+  flex: 1 1 auto; 
+}
+
+/* Buttons */
+.btn { 
+  background: rgba(255, 255, 255, 0.08); 
+  border: 1px solid var(--border); 
+  color: var(--text); 
+  padding: 8px 12px; 
+  border-radius: 8px; 
+  cursor: pointer; 
+  font-weight: 500; 
+  font-size: 13px;
+  transition: all 0.2s ease; 
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.btn:hover { 
+  background: rgba(255, 255, 255, 0.12); 
+  border-color: #2a3a4d; 
+  transform: translateY(-1px); 
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.btn:active {
+  transform: translateY(0);
+  background: rgba(255, 255, 255, 0.16);
+  border-color: #2a3a4d;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.btn.good { 
+  background: rgba(91, 156, 255, 0.15); 
+  border-color: rgba(91, 156, 255, 0.3); 
+  color: #5b9cff;
+}
+
+.btn.good:hover {
+  background: rgba(91, 156, 255, 0.2); 
+  border-color: rgba(91, 156, 255, 0.4);
+}
+
+.btn.good:active {
+  transform: translateY(0);
+  background: rgba(91, 156, 255, 0.25);
+  border-color: rgba(91, 156, 255, 0.5);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Better button spacing in toolbars */
+.toolbar .btn {
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.output { 
+  flex: 1 1 auto; 
+  min-height: 0; 
+  min-width: 0; 
+  padding: 12px; 
+  overflow: auto; 
+}
+
+pre.pretty { 
+  margin: 0; 
+  white-space: pre; 
+  color: var(--code); 
+  overflow: auto; 
+}
+
+.error { 
+  color: var(--error); 
+  font-size: 13px; 
+  padding: 8px 12px; 
+  border-top: 1px solid var(--border); 
+  background: rgba(255,0,0,0.06); 
+}
+
+/* Status/footer styling */
+.status { 
+  color: var(--muted); 
+  font-size: 12px; 
+  padding: 8px 12px; 
+  border-top: 1px solid var(--border); 
+  display: flex; 
+  gap: 12px; 
+  margin-bottom: 0; 
+  min-height: 36px;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* Ensure consistent footer height for panes */
+.pane .status {
+  flex-shrink: 0;
+  min-height: 36px;
+}
+
+.pill {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 20px;
+  line-height: 1;
+}
+
+.pill.error {
+  background: rgba(255, 107, 107, 0.1);
+  color: var(--error);
+  border: 1px solid rgba(255, 107, 107, 0.3);
+}
+
+.json-tree { 
+  font-size: 13px; 
+  line-height: 1.5; 
+}
+
+.json-key { 
+  color: #9cdcfe; 
+}
+
+.json-string { 
+  color: #ce9178; 
+}
+
+.json-number { 
+  color: #b5cea8; 
+}
+
+.json-boolean { 
+  color: #4fc1ff; 
+}
+
+.json-null { 
+  color: #c586c0; 
+}
+
+@media (max-width: 980px) { 
+  .wrap { 
+    grid-template-columns: 1fr; 
+  } 
+}
+
+/* Header styles */
+.header {
+  background: linear-gradient(180deg, var(--panel), var(--panel-2));
+  border-bottom: 1px solid var(--border);
+  padding: 12px 16px;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #fff;
+  margin: 0;
+  padding: 0;
+}
+
+.title small {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--muted);
+  margin-left: 8px;
+}
+
+.attribution {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 8px;
+}
+
+.attribution a {
+  color: var(--muted);
+  text-decoration: none;
+  transition: text-decoration 0.2s ease;
+}
+
+.attribution a:hover {
+  text-decoration: underline;
+}
+
+.attribution span:not(:last-child) {
+  margin-right: 4px;
+}
+
+/* Toggle switch styles */
+.switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  position: relative;
+  overflow: visible;
+}
+
+.switch:hover {
+  opacity: 0.9;
+}
+
+/* Custom tooltip styles */
+.switch[data-tooltip]:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  background: rgba(0, 0, 0, 0.9);
+  color: white;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+  z-index: 9999;
+  margin-bottom: 8px;
+  pointer-events: none;
+  max-width: 300px;
+  text-align: left;
+}
+
+.switch[data-tooltip]:hover::before {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  left: 20px;
+  border: 5px solid transparent;
+  border-top-color: rgba(0, 0, 0, 0.9);
+  margin-bottom: 3px;
+  pointer-events: none;
+}
+
+.switch input[type="checkbox"] {
+  appearance: none;
+  width: 32px;
+  height: 18px;
+  background: #333;
+  border-radius: 9px;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.2s;
+  border: none;
+  outline: none;
+}
+
+.switch input[type="checkbox"]:checked {
+  background: #5b9cff;
+}
+
+.switch input[type="checkbox"]::before {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.2s;
+}
+
+.switch input[type="checkbox"]:checked::before {
+  transform: translateX(14px);
+}
+
+.switch input[type="checkbox"]:active {
+  transform: scale(0.95);
+}
+
+.switch label {
+  font-size: 12px;
+  color: #ccc;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+}
+
+/* Editor styles */
+.editor {
+  position: relative;
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Improve line numbers spacing */
+.line-numbers {
+  background: var(--panel-2);
+  border-right: 1px solid var(--border);
+  padding: 12px 8px 12px 12px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+  text-align: right;
+  user-select: none;
+  min-width: 45px;
+  line-height: 18px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.line-number {
+  height: 18px;
+  line-height: 18px;
+  padding-right: 8px;
+}
+
+.line-number-wrapped {
+  color: rgba(255, 255, 255, 0.2);
+  font-style: italic;
+}
+
+.marker-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Error indicator styles */
+.error-line-indicator {
+  position: absolute;
+  background: var(--error);
+  border-radius: 2px;
+  z-index: 2;
+  opacity: 0.8;
+  box-shadow: 0 0 4px rgba(255, 107, 107, 0.3);
+  animation: error-pulse 2s ease-in-out infinite;
+}
+
+.error-char-highlight {
+  position: absolute;
+  background: rgba(255, 107, 107, 0.2);
+  border: 2px solid var(--error);
+  border-radius: 2px;
+  z-index: 2;
+  animation: error-pulse 2s ease-in-out infinite;
+}
+
+@keyframes error-pulse {
+  0%, 100% { opacity: 0.8; }
+  50% { opacity: 1; }
+}
+
+/* Error message styling for output pane */
+.error-message {
+  color: var(--error);
+  font-size: 13px;
+  margin-top: 8px;
+  padding: 8px;
+  background: rgba(255, 107, 107, 0.1);
+  border: 1px solid rgba(255, 107, 107, 0.3);
+  border-radius: 6px;
+}
+
+.error-hint {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 4px;
+  padding: 6px 8px;
+  background: rgba(139, 152, 165, 0.1);
+  border: 1px solid rgba(139, 152, 165, 0.2);
+  border-radius: 4px;
+  font-style: italic;
+}
+
+/* Error output styling for the main output area */
+.error-output {
+  padding: 20px;
+  text-align: center;
+}
+
+.error-output .error-message {
+  margin-bottom: 16px;
+}
+
+/* Improve textarea styling */
+textarea {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--code);
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 18px;
+  padding: 12px 12px 12px 8px;
+  resize: none;
+  outline: none;
+  min-height: 0;
+  tab-size: 2;
+  overflow: auto;
+}
+
+textarea:focus {
+  background: rgba(255, 255, 255, 0.02);
+} 
+
+/* Header toolbar styling */
+.header .toolbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.header .toolbar .spacer {
+  flex: 1 1 auto;
+} 
+
+/* Output pane with line numbers */
+#right .output {
+  position: relative;
+  display: flex;
+  flex: 1;
+  overflow: visible;
+  min-height: 0;
+  background: linear-gradient(180deg, var(--panel), var(--panel-2)) !important;
+  padding: 0 !important; /* Override general .output padding */
+}
+
+/* Override general line-numbers for output pane */
+#right .output .line-numbers {
+  background: transparent !important;
+  border-right: 1px solid var(--border);
+  padding: 12px 8px 12px 8px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+  text-align: right;
+  user-select: none;
+  min-width: 45px;
+  line-height: 18px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+#right .line-number {
+  height: 18px;
+  line-height: 18px;
+  padding-right: 8px;
+}
+
+#right .line-number-wrapped {
+  color: rgba(255, 255, 255, 0.2);
+  font-style: italic;
+}
+
+#right .output .json-tree,
+#right .output .pretty {
+  flex: 1;
+  overflow: auto;
+  padding: 12px 12px 12px 8px;
+  margin: 0;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 12px;
+  line-height: 18px;
+  background: linear-gradient(180deg, var(--panel), var(--panel-2)) !important;
+  border: none;
+  outline: none;
+  resize: none;
+  color: #d4d4d4;
+  min-height: 0;
+}
+
+#right .output .json-tree {
+  padding-left: 8px;
+}
+
+#right .output .pretty {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+/* Ensure the output pane container has proper overflow */
+#right {
+  overflow: hidden;
+  background: linear-gradient(180deg, var(--panel), var(--panel-2)) !important;
+}
+
+#right .pane {
+  background: linear-gradient(180deg, var(--panel), var(--panel-2)) !important;
+  overflow: visible !important;
+}
+
+/* Fix output pane content display */
+#right .output > *:not(.line-numbers) {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Ensure content is visible */
+#right .output .json-tree,
+#right .output .pretty {
+  display: block;
+  visibility: visible;
+  opacity: 1;
+}
+
+/* Configuration footer styling */
+.configuration-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--panel-2);
+  gap: 16px;
+  overflow: visible;
+}
+
+.config-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.config-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.config-item label {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.config-item select {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  min-width: 80px;
+}
+
+.config-item select:focus {
+  outline: none;
+  border-color: var(--accent);
+} 
