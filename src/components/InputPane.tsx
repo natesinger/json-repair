@@ -1,6 +1,6 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react'
+import React, { useRef, useEffect, useCallback, useState } from 'react'
+import { ErrorLocation } from '../types'
 import { locateJsonError } from '../utils/jsonUtils'
-
 
 interface InputPaneProps {
   value: string
@@ -27,11 +27,15 @@ const InputPane: React.FC<InputPaneProps> = ({
   errorInfo: propErrorInfo
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const [localErrorInfo, setLocalErrorInfo] = useState<{
-    line: number
-    col: number
-    token?: string
-  } | null>(null)
+  
+  // Drag and drop state
+  const [isDragOver, setIsDragOver] = useState(false)
+  const [dragCounter, setDragCounter] = useState(0)
+  const [dragError, setDragError] = useState<string | null>(null)
+  const [isProcessingFile, setIsProcessingFile] = useState(false)
+  
+  // Local error state for input validation
+  const [localErrorInfo, setLocalErrorInfo] = useState<ErrorLocation | null>(null)
   
   // Use prop error info if available and has valid line/col, otherwise use local error info
   // Clear local error info if prop error info is null (JSON is valid)
@@ -166,6 +170,27 @@ const InputPane: React.FC<InputPaneProps> = ({
     }, 0)
     return () => clearTimeout(timer)
   }, [updateLineNumbers, updateInputStatus])
+
+  // Global drag event prevention to stop browser from opening files
+  useEffect(() => {
+    const preventDefaultDrag = (e: DragEvent) => {
+      e.preventDefault()
+    }
+    
+    const preventDefaultDrop = (e: DragEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+    
+    // Prevent default drag/drop behavior globally
+    document.addEventListener('dragover', preventDefaultDrag)
+    document.addEventListener('drop', preventDefaultDrop)
+    
+    return () => {
+      document.removeEventListener('dragover', preventDefaultDrag)
+      document.removeEventListener('drop', preventDefaultDrop)
+    }
+  }, [])
 
   // Handle window resize to update line numbers when text wrapping changes
   useEffect(() => {
@@ -321,44 +346,123 @@ const InputPane: React.FC<InputPaneProps> = ({
     }, 0)
   }
 
+  // Enhanced drag and drop handlers
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragCounter(prev => prev + 1)
+    setIsDragOver(true)
+    setDragError(null)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragCounter(prev => Math.max(0, prev - 1))
+    if (dragCounter <= 1) {
+      setIsDragOver(false)
+    }
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+  }
+
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault()
+    e.stopPropagation()
+    setIsDragOver(false)
+    setDragCounter(0)
+    setDragError(null)
     
     const files = Array.from(e.dataTransfer.files)
-    if (files.length > 0) {
-      const file = files[0]
-      if (file.type === 'text/plain' || file.name.endsWith('.json') || file.name.endsWith('.txt')) {
-        try {
-          const text = await file.text()
-          onChange(text)
-          
-          // Reset scroll position to top to ensure proper alignment
-          if (textareaRef.current) {
-            textareaRef.current.scrollTop = 0
-          }
-          
-          // Update line numbers and status after file load
-          setTimeout(() => {
-            updateLineNumbers()
-            updateInputStatus()
-            
-            // Check for errors after file load
-            if (text.trim()) {
-              try {
-                JSON.parse(text)
-                console.log('FileDrop: JSON is valid, clearing localErrorInfo')
-                setLocalErrorInfo(null)
-              } catch (err) {
-                // JSON is invalid, error will be set by handleInput
-              }
-            } else {
-              setLocalErrorInfo(null)
-            }
-          }, 0)
-        } catch (error) {
-          console.error('Error reading file:', error)
-        }
+    if (files.length === 0) {
+      setDragError('No files were dropped')
+      return
+    }
+    
+    if (files.length > 1) {
+      setDragError('Please drop only one file at a time')
+      return
+    }
+    
+    const file = files[0]
+    
+    // Enhanced file validation
+    const isValidFile = () => {
+      // Check file type
+      if (file.type === 'text/plain' || file.type === 'application/json') {
+        return true
       }
+      
+      // Check file extension
+      const extension = file.name.toLowerCase().split('.').pop()
+      const validExtensions = ['json', 'txt', 'js', 'py', 'md', 'csv', 'xml', 'yaml', 'yml']
+      if (extension && validExtensions.includes(extension)) {
+        return true
+      }
+      
+      return false
+    }
+    
+    if (!isValidFile()) {
+      setDragError(`Unsupported file type: ${file.type || 'unknown'}. Please drop a text file (.txt, .json, .js, .py, .md, .csv, .xml, .yaml, .yml)`)
+      return
+    }
+    
+    // Check file size (limit to 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setDragError('File too large. Please drop a file smaller than 5MB')
+      return
+    }
+    
+    setIsProcessingFile(true)
+    
+    try {
+      const text = await file.text()
+      
+      // Basic content validation
+      if (!text.trim()) {
+        setDragError('File is empty or contains only whitespace')
+        return
+      }
+      
+      // Success! Load the file content
+      onChange(text)
+      
+      // Reset scroll position to top to ensure proper alignment
+      if (textareaRef.current) {
+        textareaRef.current.scrollTop = 0
+      }
+      
+      // Update line numbers and status after file load
+      setTimeout(() => {
+        updateLineNumbers()
+        updateInputStatus()
+        
+        // Check for errors after file load
+        if (text.trim()) {
+          try {
+            JSON.parse(text)
+            console.log('FileDrop: JSON is valid, clearing localErrorInfo')
+            setLocalErrorInfo(null)
+          } catch (err) {
+            // JSON is invalid, error will be set by handleInput
+          }
+        } else {
+          setLocalErrorInfo(null)
+        }
+      }, 0)
+      
+      // Clear any previous drag errors
+      setDragError(null)
+      
+    } catch (error) {
+      console.error('Error reading file:', error)
+      setDragError('Failed to read file. Please try again.')
+    } finally {
+      setIsProcessingFile(false)
     }
   }
 
@@ -373,7 +477,13 @@ const InputPane: React.FC<InputPaneProps> = ({
         </div>
       </header>
 
-      <div className="editor">
+      <div 
+        className="editor"
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
+      >
         <div 
           className="line-numbers" 
           id="lineNumbers"
@@ -395,15 +505,15 @@ const InputPane: React.FC<InputPaneProps> = ({
           ref={textareaRef}
           id="input"
           spellCheck={false}
-          placeholder="Paste JSON, Python dict, or messy data here…"
+          placeholder="Paste JSON, Python dict, or messy data here… or drag and drop a file"
           value={value}
           onChange={handleInput}
           onInput={handleInputChange}
           onScroll={handleScroll}
           onKeyDown={handleKeyDown}
           onPaste={handlePasteEvent}
-          onDrop={handleDrop}
-          onDragOver={(e) => e.preventDefault()}
+          className={`${isDragOver ? 'drag-over' : ''} ${dragError ? 'drag-error' : ''}`}
+          draggable={false}
         />
         <div id="markerLayer" className="marker-layer" aria-hidden="true">
           {errorInfo && errorInfo.line && errorInfo.col && (
@@ -418,10 +528,48 @@ const InputPane: React.FC<InputPaneProps> = ({
             />
           )}
         </div>
+        
+        {/* Drag and Drop Visual Feedback */}
+        {isDragOver && (
+          <div className="drag-overlay">
+            <div className="drag-content">
+              <div className="drag-icon">📁</div>
+              <div className="drag-text">Drop file here</div>
+              <div className="drag-hint">Supported: .json, .txt, .js, .py, .md, .csv, .xml, .yaml, .yml</div>
+            </div>
+          </div>
+        )}
+        
+        {dragError && (
+          <div className="drag-error-message">
+            <div className="drag-error-icon">⚠️</div>
+            <div className="drag-error-text">{dragError}</div>
+            <button 
+              className="drag-error-dismiss" 
+              onClick={() => setDragError(null)}
+              aria-label="Dismiss error"
+            >
+              ×
+            </button>
+          </div>
+        )}
+        
+        {isProcessingFile && (
+          <div className="file-processing">
+            <div className="processing-spinner"></div>
+            <div className="processing-text">Processing file...</div>
+          </div>
+        )}
+        
       </div>
       <div className="status" id="inStatus">
         <span className="pill">{inputStatus.lines} lines</span>
         <span className="pill">{inputStatus.chars} chars</span>
+        <div className="spacer"></div>
+        <span className="pill drag-hint-pill" title="Drag & drop files here">
+          <span className="drag-hint-icon-small">📁</span>
+          <span className="drag-hint-text-small">Drag files here</span>
+        </span>
       </div>
     </section>
   )

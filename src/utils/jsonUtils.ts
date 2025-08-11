@@ -32,14 +32,34 @@ export function repairJson(text: string): string {
   s = s.replace(/([\[,]\s*)([A-Za-z_][\w-]*)(\s*$)/gm, '$1"$2"')
   
   // 3. Convert single → double quotes
-  s = s.replace(/'([^'\\]|\\.)*'/g, (m) => {
-    const inner = m.slice(1, -1)
-    const escaped = inner
-      .replace(/\\/g, '\\\\')
-      .replace(/\\"/g, '"')
-      .replace(/"/g, '\\"')
-    return '"' + escaped + '"'
-  })
+  // Use a more robust approach that correctly handles escaped characters
+  let pos = 0
+  while (pos < s.length) {
+    const quotePos = s.indexOf("'", pos)
+    if (quotePos === -1) break
+    
+    // Find the closing quote, accounting for escaped quotes
+    let endPos = quotePos + 1
+    while (endPos < s.length) {
+      if (s[endPos] === "'" && s[endPos - 1] !== "\\") {
+        break
+      }
+      endPos++
+    }
+    
+    if (endPos < s.length) {
+      const inner = s.slice(quotePos + 1, endPos)
+      const escaped = inner
+        .replace(/\\\\/g, '\\\\')  // Preserve double backslashes
+        .replace(/\\'/g, "'")      // Convert escaped single quotes to regular single quotes
+        .replace(/"/g, '\\"')      // Escape any double quotes
+      const replacement = '"' + escaped + '"'
+      s = s.slice(0, quotePos) + replacement + s.slice(endPos + 1)
+      pos = quotePos + replacement.length
+    } else {
+      pos = quotePos + 1
+    }
+  }
 
   // 4. Replace True/False/None → true/false/null
   s = s

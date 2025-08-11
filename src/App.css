@@ -383,6 +383,25 @@ pre.pretty {
   overflow: hidden;
 }
 
+/* Drag & Drop Hint Pill */
+.drag-hint-pill {
+  background: transparent !important;
+  border: none !important;
+  color: var(--muted) !important;
+  cursor: default;
+  margin-left: auto;
+}
+
+.drag-hint-icon-small {
+  font-size: 12px;
+  margin-right: 4px;
+}
+
+.drag-hint-text-small {
+  font-size: 11px;
+  font-weight: 500;
+}
+
 /* Improve line numbers spacing */
 .line-numbers {
   background: var(--panel-2);
@@ -482,6 +501,7 @@ textarea {
   flex: 1;
   background: transparent;
   border: none;
+  border-radius: 8px;
   color: var(--code);
   font-family: var(--mono);
   font-size: 13px;
@@ -492,11 +512,17 @@ textarea {
   min-height: 0;
   tab-size: 2;
   overflow: auto;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 textarea:focus {
   background: rgba(255, 255, 255, 0.02);
-} 
+  outline: none;
+}
+
+textarea:hover {
+  /* No border change on hover */
+}
 
 /* Header toolbar styling */
 .header .toolbar {
@@ -645,4 +671,178 @@ textarea:focus {
 .config-item select:focus {
   outline: none;
   border-color: var(--accent);
+}
+
+/* Drag and Drop Styles */
+.drag-over {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 2px rgba(91, 156, 255, 0.2) !important;
+}
+
+.drag-error {
+  border-color: var(--error) !important;
+  box-shadow: 0 0 0 2px rgba(255, 107, 107, 0.2) !important;
+}
+
+.drag-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(91, 156, 255, 0.1);
+  border: 3px dashed var(--accent);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  animation: dragPulse 1.5s ease-in-out infinite;
+}
+
+.drag-content {
+  text-align: center;
+  color: var(--accent);
+  padding: 20px;
+}
+
+.drag-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+  animation: dragBounce 0.6s ease-in-out infinite alternate;
+}
+
+.drag-text {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.drag-hint {
+  font-size: 12px;
+  color: var(--muted);
+  opacity: 0.8;
+}
+
+.drag-error-message {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: rgba(255, 107, 107, 0.95);
+  border: 1px solid var(--error);
+  border-radius: 8px;
+  padding: 12px 16px;
+  color: white;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 400px;
+  z-index: 20;
+  animation: slideInRight 0.3s ease-out;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.drag-error-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.drag-error-text {
+  flex: 1;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.drag-error-dismiss {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background-color 0.2s ease;
+  flex-shrink: 0;
+}
+
+.drag-error-dismiss:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.file-processing {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.8);
+  border-radius: 12px;
+  padding: 24px;
+  color: white;
+  text-align: center;
+  z-index: 15;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.processing-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-top: 3px solid white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 16px;
+}
+
+.processing-text {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* Drag and Drop Animations */
+@keyframes dragPulse {
+  0%, 100% { 
+    background: rgba(91, 156, 255, 0.1);
+    border-color: var(--accent);
+  }
+  50% { 
+    background: rgba(91, 156, 255, 0.2);
+    border-color: #7bb3ff;
+  }
+}
+
+@keyframes dragBounce {
+  0% { transform: translateY(0px); }
+  100% { transform: translateY(-8px); }
+}
+
+@keyframes slideInRight {
+  0% { 
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  100% { 
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeIn {
+  0% { 
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.9);
+  }
+  100% { 
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 } 

@@ -18,10 +18,10 @@ export interface JsonParseResult {
 }
 
 export interface ErrorLocation {
-  pos: number | null
+  pos?: number | null
   line: number | null
   col: number | null
-  token: string | null
+  token?: string
 }
 
 export interface ProcessedResult {

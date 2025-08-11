@@ -258,7 +258,10 @@ const OutputPane: React.FC<OutputPaneProps> = ({ result, visualize, settings, on
   const handleCopy = async () => {
     if (result?.result.obj) {
       try {
-        await navigator.clipboard.writeText(JSON.stringify(result.result.obj, null, 2))
+        // Use minified output if minify is enabled, otherwise use pretty-printed with specified tab size
+        const space = settings.minify ? undefined : settings.tabSize
+        const jsonString = JSON.stringify(result.result.obj, null, space)
+        await navigator.clipboard.writeText(jsonString)
         // You could add a toast notification here
       } catch (err) {
         console.error('Failed to copy:', err)
@@ -268,7 +271,10 @@ const OutputPane: React.FC<OutputPaneProps> = ({ result, visualize, settings, on
 
   const handleDownload = () => {
     if (result?.result.obj) {
-      const blob = new Blob([JSON.stringify(result.result.obj, null, 2)], { 
+      // Use minified output if minify is enabled, otherwise use pretty-printed with specified tab size
+      const space = settings.minify ? undefined : settings.tabSize
+      const jsonString = JSON.stringify(result.result.obj, null, space)
+      const blob = new Blob([jsonString], { 
         type: 'application/json' 
       })
       const url = URL.createObjectURL(blob)
