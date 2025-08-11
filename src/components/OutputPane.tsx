@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react'
 import { ProcessedResult, Settings } from '../types'
 import { getErrorSuggestion, getVisualLineNumber } from '../utils/jsonUtils'
-import ToggleSwitch from './ToggleSwitch'
+import ConfigurationFooter from './ConfigurationFooter'
 
 
 interface OutputPaneProps {
@@ -67,33 +67,38 @@ const OutputPane: React.FC<OutputPaneProps> = ({ result, visualize, settings, on
     // Calculate how many visual lines each logical line takes up
     let visualLineNumbers: number[] = []
     
-    for (let logicalLineNum = 1; logicalLineNum <= maxLogicalLines; logicalLineNum++) {
-      const logicalLine = logicalLines[logicalLineNum - 1] || ''
-      
-      // Calculate how many visual lines this logical line takes up
-      if (outputEl) {
+    // If minified, we only have one line regardless of content
+    if (settings.minify) {
+      visualLineNumbers = [1]
+    } else {
+      for (let logicalLineNum = 1; logicalLineNum <= maxLogicalLines; logicalLineNum++) {
+        const logicalLine = logicalLines[logicalLineNum - 1] || ''
         
-        // Simplified approach - estimate wrapping based on character count and container width
-        // This avoids DOM manipulation entirely and prevents crashes
-        const estimatedCharsPerLine = Math.floor((outputEl.clientWidth - 24) / 8) // Rough estimate: 8px per character
-        const estimatedLines = Math.ceil(logicalLine.length / estimatedCharsPerLine) || 1
-        
-        // Calculate how many visual lines this logical line needs - exactly like input pane
-        const visualLinesForThisLine = estimatedLines
-        
-        // Add line numbers for each visual line
-        for (let visualLine = 1; visualLine <= visualLinesForThisLine; visualLine++) {
+        // Calculate how many visual lines this logical line takes up
+        if (outputEl) {
+          
+          // Simplified approach - estimate wrapping based on character count and container width
+          // This avoids DOM manipulation entirely and prevents crashes
+          const estimatedCharsPerLine = Math.floor((outputEl.clientWidth - 24) / 8) // Rough estimate: 8px per character
+          const estimatedLines = Math.ceil(logicalLine.length / estimatedCharsPerLine) || 1
+          
+          // Calculate how many visual lines this logical line needs - exactly like input pane
+          const visualLinesForThisLine = estimatedLines
+          
+          // Add line numbers for each visual line
+          for (let visualLine = 1; visualLine <= visualLinesForThisLine; visualLine++) {
+            visualLineNumbers.push(logicalLineNum)
+          }
+        } else {
+          // Fallback: just show one line number per logical line
           visualLineNumbers.push(logicalLineNum)
         }
-      } else {
-        // Fallback: just show one line number per logical line
-        visualLineNumbers.push(logicalLineNum)
       }
     }
     
     // Update React state instead of manipulating DOM directly
     setLineNumbers(visualLineNumbers)
-  }, [visualize, result])
+  }, [visualize, result, settings.minify])
 
   // Update output status with line count
   const updateOutputStatus = useCallback(() => {
@@ -119,15 +124,20 @@ const OutputPane: React.FC<OutputPaneProps> = ({ result, visualize, settings, on
       const preElement = outputEl.querySelector('pre.pretty')
       if (preElement) {
         const content = (preElement as HTMLElement).innerText || preElement.textContent || ''
-        // Use the same simple logic as input pane - just count newlines
-        lineCount = Math.max(content.split('\n').length, 1)
+        // If minified, we always have 1 line
+        if (settings.minify) {
+          lineCount = 1
+        } else {
+          // Use the same simple logic as input pane - just count newlines
+          lineCount = Math.max(content.split('\n').length, 1)
+        }
         charCount = content.length
       }
     }
 
     // Update React state instead of manipulating DOM directly
     setOutputStatus({ lines: lineCount, chars: charCount })
-  }, [result, visualize])
+  }, [result, visualize, settings.minify])
 
   // Sync scroll between output content and line numbers
   const handleScroll = useCallback(() => {
@@ -159,7 +169,7 @@ const OutputPane: React.FC<OutputPaneProps> = ({ result, visualize, settings, on
     }
   }, [handleScroll])
 
-  // Update line numbers and status when result or visualize changes
+  // Update line numbers and status when result, visualize, or minify changes
   useEffect(() => {
     // Small delay to ensure DOM is ready
     const timer = setTimeout(() => {
@@ -169,7 +179,7 @@ const OutputPane: React.FC<OutputPaneProps> = ({ result, visualize, settings, on
       attachScrollListener()
     }, 0)
     return () => clearTimeout(timer)
-  }, [result, visualize, updateLineNumbers, updateOutputStatus, attachScrollListener])
+  }, [result, visualize, settings.minify, updateLineNumbers, updateOutputStatus, attachScrollListener])
 
   // Initial line numbers setup
   useEffect(() => {
@@ -343,38 +353,13 @@ const OutputPane: React.FC<OutputPaneProps> = ({ result, visualize, settings, on
           )}
           <pre className="pretty">Paste some data to get started...</pre>
         </div>
-        <div className="configuration-footer">
-          <div className="config-controls">
-            <ToggleSwitch
-              id="liveMode"
-              checked={settings.live}
-              onChange={(checked) => onSettingsChange({ live: checked })}
-              label="Live update"
-              dataTooltip={settings.live ? "Live update on - changes are processed automatically" : "Live update off - use Shift+Enter to process manually"}
-            />
-            <ToggleSwitch
-              id="visualize"
-              checked={settings.visualize}
-              onChange={(checked) => onSettingsChange({ visualize: checked })}
-              label="Visual tree"
-            />
-          </div>
-          <div className="config-controls">
-            <div className="config-item">
-              <label htmlFor="tabSize">Tab size:</label>
-              <select
-                id="tabSize"
-                value={settings.tabSize}
-                onChange={(e) => onSettingsChange({ tabSize: Number(e.target.value) as 2 | 4 })}
-              >
-                <option value={2}>2 spaces</option>
-                <option value={4}>4 spaces</option>
-              </select>
-            </div>
-          </div>
-        </div>
+        <ConfigurationFooter
+          settings={settings}
+          onSettingsChange={onSettingsChange}
+        />
         <div className="status">
           <span className="pill">Ready</span>
+          {settings.minify && <span className="pill">Minified</span>}
           <span className="pill">{outputStatus.lines} lines</span>
           <span className="pill">{outputStatus.chars} chars</span>
         </div>
@@ -414,38 +399,13 @@ const OutputPane: React.FC<OutputPaneProps> = ({ result, visualize, settings, on
           )}
           <pre className="pretty"></pre>
         </div>
-        <div className="configuration-footer">
-          <div className="config-controls">
-            <ToggleSwitch
-              id="liveMode"
-              checked={settings.live}
-              onChange={(checked) => onSettingsChange({ live: checked })}
-              label="Live update"
-              dataTooltip={settings.live ? "Live update on - changes are processed automatically" : "Live update off - use Shift+Enter to process manually"}
-            />
-            <ToggleSwitch
-              id="visualize"
-              checked={settings.visualize}
-              onChange={(checked) => onSettingsChange({ visualize: checked })}
-              label="Visual tree"
-            />
-          </div>
-          <div className="config-controls">
-            <div className="config-item">
-              <label htmlFor="tabSize">Tab size:</label>
-              <select
-                id="tabSize"
-                value={settings.tabSize}
-                onChange={(e) => onSettingsChange({ tabSize: Number(e.target.value) as 2 | 4 })}
-              >
-                <option value={2}>2 spaces</option>
-                <option value={4}>4 spaces</option>
-              </select>
-            </div>
-          </div>
-        </div>
+        <ConfigurationFooter
+          settings={settings}
+          onSettingsChange={onSettingsChange}
+        />
         <div className="status">
           <span className="pill">Ready</span>
+          {settings.minify && <span className="pill">Minified</span>}
           <span className="pill">{outputStatus.lines} lines</span>
           <span className="pill">{outputStatus.chars} chars</span>
         </div>
@@ -458,7 +418,9 @@ const OutputPane: React.FC<OutputPaneProps> = ({ result, visualize, settings, on
     let fileSize = '0.0'
     
     try {
-      jsonString = JSON.stringify(parseResult.obj, null, settings.tabSize)
+      // Use minified output if minify is enabled, otherwise use pretty-printed with specified tab size
+      const space = settings.minify ? undefined : settings.tabSize
+      jsonString = JSON.stringify(parseResult.obj, null, space)
       fileSize = (new Blob([jsonString]).size / 1024).toFixed(1)
     } catch (err) {
       jsonString = 'Error: Could not stringify JSON'
@@ -476,7 +438,7 @@ const OutputPane: React.FC<OutputPaneProps> = ({ result, visualize, settings, on
           </div>
         </header>
         <div className="output" ref={outputRef}>
-          {!visualize && (
+          {!visualize && !settings.minify && (
             <div className="line-numbers" ref={lineNumbersRef}>
               {lineNumbers.map((lineNum, index) => {
                 // Check if this is a wrapped line (same number as previous)
@@ -500,38 +462,13 @@ const OutputPane: React.FC<OutputPaneProps> = ({ result, visualize, settings, on
             <pre className="pretty">{jsonString}</pre>
           )}
         </div>
-        <div className="configuration-footer">
-          <div className="config-controls">
-            <ToggleSwitch
-              id="liveMode"
-              checked={settings.live}
-              onChange={(checked) => onSettingsChange({ live: checked })}
-              label="Live update"
-              dataTooltip={settings.live ? "Live update on - changes are processed automatically" : "Live update off - use Shift+Enter to process manually"}
-            />
-            <ToggleSwitch
-              id="visualize"
-              checked={settings.visualize}
-              onChange={(checked) => onSettingsChange({ visualize: checked })}
-              label="Visual tree"
-            />
-          </div>
-          <div className="config-controls">
-            <div className="config-item">
-              <label htmlFor="tabSize">Tab size:</label>
-              <select
-                id="tabSize"
-                value={settings.tabSize}
-                onChange={(e) => onSettingsChange({ tabSize: Number(e.target.value) as 2 | 4 })}
-              >
-                <option value={2}>2 spaces</option>
-                <option value={4}>4 spaces</option>
-              </select>
-            </div>
-          </div>
-        </div>
+        <ConfigurationFooter
+          settings={settings}
+          onSettingsChange={onSettingsChange}
+        />
         <div className="status">
           <span className="pill">Parsed ✓</span>
+          {settings.minify && <span className="pill">Minified</span>}
           <span className="pill">{parseResult.ms} ms</span>
           <span className="pill">{fileSize} KB</span>
           <span className="pill">{outputStatus.lines} lines</span>
@@ -590,36 +527,10 @@ const OutputPane: React.FC<OutputPaneProps> = ({ result, visualize, settings, on
           )}
         </div>
       </div>
-      <div className="configuration-footer">
-        <div className="config-controls">
-          <ToggleSwitch
-            id="liveMode"
-            checked={settings.live}
-            onChange={(checked) => onSettingsChange({ live: checked })}
-            label="Live update"
-            dataTooltip={settings.live ? "Live update on - changes are processed automatically" : "Live update off - use Shift+Enter to process manually"}
-          />
-          <ToggleSwitch
-            id="visualize"
-            checked={settings.visualize}
-            onChange={(checked) => onSettingsChange({ visualize: checked })}
-            label="Visual tree"
-          />
-        </div>
-        <div className="config-controls">
-          <div className="config-item">
-            <label htmlFor="tabSize">Tab size:</label>
-            <select
-              id="tabSize"
-              value={settings.tabSize}
-              onChange={(e) => onSettingsChange({ tabSize: Number(e.target.value) as 2 | 4 })}
-            >
-              <option value={2}>2 spaces</option>
-              <option value={4}>4 spaces</option>
-            </select>
-          </div>
-        </div>
-      </div>
+      <ConfigurationFooter
+        settings={settings}
+        onSettingsChange={onSettingsChange}
+      />
       <div className="status">
         <span className="pill error">✗ Parse Error</span>
       </div>

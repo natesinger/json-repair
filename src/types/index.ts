@@ -2,6 +2,7 @@ export interface Settings {
   live: boolean
   visualize: boolean
   tabSize: 2 | 4
+  minify: boolean
 }
 
 export interface JsonParseResult {

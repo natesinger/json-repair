@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { JsonParseResult, ProcessedResult } from '../types'
-import { repairJson, locateJsonError } from '../utils/jsonUtils'
+import { repairJson, detectOriginalJsonErrors, locateJsonError } from '../utils/jsonUtils'
 
 const INPUT_STORAGE_KEY = 'jrInput:v1'
 
@@ -115,6 +115,10 @@ function safeParse(text: string): JsonParseResult {
   }
 
   const before = performance.now()
+  
+  // First, try to detect errors in the original text for better positioning
+  const originalError = detectOriginalJsonErrors(text)
+  
   const cleaned = repairJson(text)
   
   try {
@@ -140,15 +144,29 @@ function safeParse(text: string): JsonParseResult {
       }
     } catch (secondError: any) {
       // This error requires manual intervention
-      const result = locateJsonError(secondError?.message, doubleCleaned)
-      return { 
-        ok: false, 
-        error: secondError?.message || 'Unknown error', 
-        cleaned: doubleCleaned, 
-        pos: result.pos || undefined, 
-        line: result.line || undefined, 
-        col: result.col || undefined,
-        token: result.token || undefined
+      // Use the original error detection if available, otherwise fall back to the old method
+      if (originalError) {
+        return { 
+          ok: false, 
+          error: originalError.error || secondError?.message || 'Unknown error', 
+          cleaned: doubleCleaned, 
+          pos: originalError.pos || undefined, 
+          line: originalError.line || undefined, 
+          col: originalError.col || undefined,
+          token: originalError.token || undefined
+        }
+      } else {
+        // Fallback to old error detection method
+        const result = locateJsonError(secondError?.message, doubleCleaned)
+        return { 
+          ok: false, 
+          error: secondError?.message || 'Unknown error', 
+          cleaned: doubleCleaned, 
+          pos: result.pos || undefined, 
+          line: result.line || undefined, 
+          col: result.col || undefined,
+          token: result.token || undefined
+        }
       }
     }
   }

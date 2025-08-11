@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Settings } from '../types'
 
 const SETTINGS_KEY = 'jrSettings:v5'
-const defaultSettings: Settings = { live: true, visualize: false, tabSize: 4 }
+const defaultSettings: Settings = { live: true, visualize: false, tabSize: 4, minify: false }
 
 export function useSettings() {
   const [settings, setSettings] = useState<Settings>(defaultSettings)

@@ -91,6 +91,188 @@ export function repairJson(text: string): string {
   return s.trim()
 }
 
+/**
+ * Detect JSON errors in the original text before any repairs
+ * This provides more accurate error positioning
+ */
+export function detectOriginalJsonErrors(text: string): {
+  pos: number | null
+  line: number | null
+  col: number | null
+  token: string | null
+  error: string | null
+} | null {
+  if (!text) return null
+  
+  console.log('🔍 detectOriginalJsonErrors: scanning original text for structural errors')
+  
+  // First, try to parse the original text to see what error we get
+  try {
+    JSON.parse(text)
+    return null // No errors found
+  } catch (e: any) {
+    const errorMsg = e.message || 'Unknown error'
+    console.log('🔍 Original text parse error:', errorMsg)
+    
+    // Look for structural patterns that commonly cause JSON errors
+    const lines = text.split('\n')
+    
+    for (let lineNum = 0; lineNum < lines.length; lineNum++) {
+      const line = lines[lineNum]
+      const trimmed = line.trim()
+      
+      // Skip empty lines and comment lines
+      if (!trimmed || trimmed.startsWith('//') || trimmed.startsWith('#')) continue
+      
+      // Check for double commas (like "value,,") - this is a structural issue
+      const doubleCommaMatch = line.match(/([^,]),,/)
+      if (doubleCommaMatch) {
+        const pos = lines.slice(0, lineNum).join('\n').length + line.indexOf(',,') + 1
+        console.log('🔍 Found double comma at:', { line: lineNum + 1, col: line.indexOf(',,') + 2, pos })
+        return {
+          pos,
+          line: lineNum + 1,
+          col: line.indexOf(',,') + 2,
+          token: ',',
+          error: 'Unexpected comma - remove duplicate comma'
+        }
+      }
+      
+      // Check for trailing commas that can't be auto-fixed
+      // Only flag if there's a trailing comma followed by a closing bracket/brace on the same line
+      const trailingCommaSameLine = line.match(/,\s*([}\]])/)
+      if (trailingCommaSameLine) {
+        const pos = lines.slice(0, lineNum).join('\n').length + line.indexOf(',')
+        console.log('🔍 Found trailing comma on same line at:', { line: lineNum + 1, col: line.indexOf(',') + 1, pos })
+        return {
+          pos,
+          line: lineNum + 1,
+          col: line.indexOf(',') + 1,
+          token: ',',
+          error: 'Unexpected comma - remove trailing comma'
+        }
+      }
+      
+      // Check for missing commas between properties (structural issue)
+      // Look for patterns like "} property:" or "] property:" where a comma is missing
+      const missingCommaAfterBrace = line.match(/(\s*)\}(\s*)$/)
+      if (missingCommaAfterBrace) {
+        const nextLine = lines[lineNum + 1]
+        if (nextLine && nextLine.trim().match(/^[a-zA-Z_][a-zA-Z0-9_]*\s*:/)) {
+          const pos = lines.slice(0, lineNum).join('\n').length + line.length
+          console.log('🔍 Found missing comma after brace at:', { line: lineNum + 1, col: line.length + 1, pos })
+          return {
+            pos,
+            line: lineNum + 1,
+            col: line.length + 1,
+            token: ',',
+            error: 'Missing comma - add comma after closing brace'
+          }
+        }
+      }
+      
+      // Check for missing commas after closing brackets
+      const missingCommaAfterBracket = line.match(/(\s*)\]\s*$/)
+      if (missingCommaAfterBracket) {
+        const nextLine = lines[lineNum + 1]
+        if (nextLine && nextLine.trim().match(/^[a-zA-Z_][a-zA-Z0-9_]*\s*:/)) {
+          const pos = lines.slice(0, lineNum).join('\n').length + line.length
+          console.log('🔍 Found missing comma after bracket at:', { line: lineNum + 1, col: line.length + 1, pos })
+          return {
+            pos,
+            line: lineNum + 1,
+            col: line.length + 1,
+            token: ',',
+            error: 'Missing comma - add comma after closing bracket'
+          }
+        }
+      }
+      
+      // Check for missing commas after values followed by properties
+      const missingCommaAfterValue = line.match(/(\s*)([a-zA-Z0-9_]+|"[^"]*"|'[^']*'|true|false|null|None|True|False)\s*$/)
+      if (missingCommaAfterValue) {
+        const nextLine = lines[lineNum + 1]
+        if (nextLine && nextLine.trim().match(/^[a-zA-Z_][a-zA-Z0-9_]*\s*:/)) {
+          const pos = lines.slice(0, lineNum).join('\n').length + line.length
+          console.log('🔍 Found missing comma after value at:', { line: lineNum + 1, col: line.length + 1, pos })
+          return {
+            pos,
+            line: lineNum + 1,
+            col: line.length + 1,
+            token: ',',
+            error: 'Missing comma - add comma after value'
+          }
+        }
+      }
+      
+      // Check for structural bracket/brace mismatches
+      // Look for lines that end with an opening bracket/brace but don't have a corresponding closing one
+      const openingBracket = line.match(/(\s*)\{\s*$/)
+      if (openingBracket) {
+        // Count opening vs closing braces from this line forward
+        let braceCount = 1
+        for (let i = lineNum + 1; i < lines.length; i++) {
+          const futureLine = lines[i]
+          braceCount += (futureLine.match(/\{/g) || []).length
+          braceCount -= (futureLine.match(/\}/g) || []).length
+          if (braceCount === 0) break
+        }
+        if (braceCount > 0) {
+          const pos = lines.slice(0, lineNum).join('\n').length + line.length
+          console.log('🔍 Found unclosed brace at:', { line: lineNum + 1, col: line.length, pos })
+          return {
+            pos,
+            line: lineNum + 1,
+            col: line.length,
+            token: '{',
+            error: 'Missing closing brace - check bracket balance'
+          }
+        }
+      }
+      
+      const openingSquareBracket = line.match(/(\s*)\[\s*$/)
+      if (openingSquareBracket) {
+        // Count opening vs closing brackets from this line forward
+        let bracketCount = 1
+        for (let i = lineNum + 1; i < lines.length; i++) {
+          const futureLine = lines[i]
+          bracketCount += (futureLine.match(/\[/g) || []).length
+          bracketCount -= (futureLine.match(/\]/g) || []).length
+          if (bracketCount === 0) break
+        }
+        if (bracketCount > 0) {
+          const pos = lines.slice(0, lineNum).join('\n').length + line.length
+          console.log('🔍 Found unclosed bracket at:', { line: lineNum + 1, col: line.length, pos })
+          return {
+            pos,
+            line: lineNum + 1,
+            col: line.length,
+            token: '[',
+            error: 'Missing closing bracket - check bracket balance'
+          }
+        }
+      }
+    }
+    
+    // If no specific structural pattern found, try to locate the error using the original error message
+    // but only if it's a structural error (not a syntax error that can be auto-fixed)
+    if (errorMsg.includes('Unexpected token') || errorMsg.includes('Unexpected end') || 
+        errorMsg.includes('Unexpected number') || errorMsg.includes('Unexpected string')) {
+      const fallbackResult = locateJsonError(errorMsg, text)
+      return {
+        pos: fallbackResult.pos,
+        line: fallbackResult.line,
+        col: fallbackResult.col,
+        token: fallbackResult.token,
+        error: errorMsg
+      }
+    }
+    
+    // For other types of errors, let the repair function handle them
+    return null
+  }
+}
+
 export function locateJsonError(msg: string, text: string): {
   pos: number | null
   line: number | null
@@ -350,6 +532,37 @@ export function getErrorSuggestion(error: string, _line?: number, _col?: number)
   
   const errorLower = error.toLowerCase()
   
+  // Check for structural error patterns first
+  if (errorLower.includes('duplicate comma') || errorLower.includes('unexpected comma')) {
+    return 'Remove the duplicate or trailing comma'
+  }
+  
+  if (errorLower.includes('missing comma')) {
+    if (errorLower.includes('after closing brace')) {
+      return 'Add a comma after the closing brace } before the next property'
+    }
+    if (errorLower.includes('after closing bracket')) {
+      return 'Add a comma after the closing bracket ] before the next property'
+    }
+    if (errorLower.includes('after value')) {
+      return 'Add a comma after the value before the next property'
+    }
+    return 'Add a comma to separate properties or array items'
+  }
+  
+  if (errorLower.includes('missing closing brace')) {
+    return 'Check that all opening braces { have matching closing braces }'
+  }
+  
+  if (errorLower.includes('missing closing bracket')) {
+    return 'Check that all opening brackets [ have matching closing brackets ]'
+  }
+  
+  if (errorLower.includes('bracket balance')) {
+    return 'Check that opening and closing brackets/braces are properly balanced'
+  }
+  
+  // Fallback to general structural suggestions
   if (errorLower.includes('unexpected token')) {
     if (errorLower.includes("'")) {
       return 'Check for missing quotes around strings or keys'
@@ -383,7 +596,7 @@ export function getErrorSuggestion(error: string, _line?: number, _col?: number)
   }
   
   if (errorLower.includes('<') || errorLower.includes('>')) {
-    return 'Remove the "<" or ">" characters - they\'s not valid in JSON'
+    return 'Remove the "<" or ">" characters - they\'re not valid in JSON'
   }
   
   return 'Check the syntax around the highlighted position'
