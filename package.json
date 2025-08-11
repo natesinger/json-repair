@@ -14,8 +14,12 @@
     "vite": "^4.4.0"
   },
   "scripts": {
+    "build": "tsc -b && vite build",
+    "cf-typegen": "wrangler types",
+    "check": "tsc && vite build && wrangler deploy --dry-run",
+    "deploy": "wrangler deploy",
     "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "lint": "eslint .",
+    "preview": "npm run build && vite preview"
   }
 }
