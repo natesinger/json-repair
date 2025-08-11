@@ -1,6 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react'
-import { JsonParseResult } from '../types'
-import { locateJsonError, getErrorSuggestion } from '../utils/jsonUtils'
+import { locateJsonError } from '../utils/jsonUtils'
 
 
 interface InputPaneProps {
@@ -82,16 +81,7 @@ const InputPane: React.FC<InputPaneProps> = ({
   const [inputStatus, setInputStatus] = useState<{ lines: number; chars: number }>({ lines: 0, chars: 0 })
   const [scrollTop, setScrollTop] = useState(0)
   
-  // Helper function to check if JSON is valid
-  const isValidJson = (text: string): boolean => {
-    if (!text.trim()) return false
-    try {
-      JSON.parse(text)
-      return true
-    } catch {
-      return false
-    }
-  }
+
 
   // Update line numbers
   const updateLineNumbers = useCallback(() => {
@@ -236,9 +226,8 @@ const InputPane: React.FC<InputPaneProps> = ({
     }
   }
 
-  const handleInputChange = (e: React.FormEvent<HTMLTextAreaElement>) => {
+  const handleInputChange = (_e: React.FormEvent<HTMLTextAreaElement>) => {
     // This fires immediately on any content change (typing, pasting, etc.)
-    const target = e.target as HTMLTextAreaElement
     
     // Reset scroll position to top to ensure proper alignment
     if (textareaRef.current) {
@@ -303,46 +292,10 @@ const InputPane: React.FC<InputPaneProps> = ({
     }
   }
 
-  const handlePaste = () => {
-    // Use a more reliable approach for paste operations
-    // 1. Immediate update after a short delay to let paste complete
-    setTimeout(() => {
-      // Reset scroll position to top to ensure proper alignment
-      if (textareaRef.current) {
-        textareaRef.current.scrollTop = 0
-      }
-      updateLineNumbers()
-      updateInputStatus()
-      
-      // Check for errors after paste and clear them immediately if JSON is valid
-      if (textareaRef.current && textareaRef.current.value.trim()) {
-        try {
-          JSON.parse(textareaRef.current.value)
-          console.log('Paste: JSON is valid, clearing localErrorInfo')
-          setLocalErrorInfo(null)
-        } catch (err) {
-          // JSON is invalid, error will be set by handleInput
-        }
-      } else {
-        setLocalErrorInfo(null)
-      }
-    }, 0)
-    
-    // 2. Update after DOM has processed the paste
-    requestAnimationFrame(() => {
-      updateLineNumbers()
-      updateInputStatus()
-    })
-    
-    // 3. Final fallback update after paste has fully settled
-    setTimeout(() => {
-      updateLineNumbers()
-      updateInputStatus()
-    }, 50)
-  }
+
 
   // Handle paste events more directly
-  const handlePasteEvent = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+  const handlePasteEvent = (_e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     // Let the default paste happen first
     // Then update everything after the paste has completed
     setTimeout(() => {

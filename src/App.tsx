@@ -31,7 +31,12 @@ function App() {
             onChange={setInputValue}
             onClear={clearInput}
             onManualProcess={processManual}
-            errorInfo={processedResult?.result?.ok === false ? processedResult.result : null}
+            errorInfo={processedResult?.result?.ok === false && processedResult.result.error ? {
+              error: processedResult.result.error,
+              line: processedResult.result.line,
+              col: processedResult.result.col,
+              token: processedResult.result.token
+            } : null}
             tabSize={settings.tabSize}
             onSample={() => {
               const sampleData = `# messy example (Python dict + comments + trailing commas)
