@@ -341,7 +341,7 @@ const OutputPane: React.FC<OutputPaneProps> = ({ result, visualize, settings, on
           </div>
         </header>
         <div className="output" ref={outputRef}>
-          {!visualize && (
+          {!visualize && !settings.minify && (
             <div className="line-numbers" ref={lineNumbersRef}>
               {lineNumbers.map((lineNum, index) => {
                 // Check if this is a wrapped line (same number as previous)
@@ -365,7 +365,7 @@ const OutputPane: React.FC<OutputPaneProps> = ({ result, visualize, settings, on
         />
         <div className="status">
           <span className="pill">Ready</span>
-          {settings.minify && <span className="pill">Minified</span>}
+          {settings.minify && <span className="pill">Minified ✓</span>}
           <span className="pill">{outputStatus.lines} lines</span>
           <span className="pill">{outputStatus.chars} chars</span>
         </div>
@@ -387,7 +387,7 @@ const OutputPane: React.FC<OutputPaneProps> = ({ result, visualize, settings, on
           </div>
         </header>
         <div className="output" ref={outputRef}>
-          {!visualize && (
+          {!visualize && !settings.minify && (
             <div className="line-numbers" ref={lineNumbersRef}>
               {lineNumbers.map((lineNum, index) => {
                 // Check if this is a wrapped line (same number as previous)
@@ -411,7 +411,7 @@ const OutputPane: React.FC<OutputPaneProps> = ({ result, visualize, settings, on
         />
         <div className="status">
           <span className="pill">Ready</span>
-          {settings.minify && <span className="pill">Minified</span>}
+          {settings.minify && <span className="pill">Minified ✓</span>}
           <span className="pill">{outputStatus.lines} lines</span>
           <span className="pill">{outputStatus.chars} chars</span>
         </div>
@@ -474,7 +474,7 @@ const OutputPane: React.FC<OutputPaneProps> = ({ result, visualize, settings, on
         />
         <div className="status">
           <span className="pill">Parsed ✓</span>
-          {settings.minify && <span className="pill">Minified</span>}
+          {settings.minify && <span className="pill">Minified ✓</span>}
           <span className="pill">{parseResult.ms} ms</span>
           <span className="pill">{fileSize} KB</span>
           <span className="pill">{outputStatus.lines} lines</span>
