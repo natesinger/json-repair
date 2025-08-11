@@ -1,12 +1,15 @@
+import { useState, useEffect } from 'react'
 import Header from './components/Header'
 import InputPane from './components/InputPane'
 import OutputPane from './components/OutputPane'
 import ErrorBoundary from './components/ErrorBoundary'
+import MobileWarning from './components/MobileWarning'
 import { useSettings } from './hooks/useSettings'
 import { useJsonProcessor } from './hooks/useJsonProcessor'
 import './App.css'
 
 function App() {
+  const [isMobile, setIsMobile] = useState(false)
   const { settings, updateSettings } = useSettings()
   const { 
     inputValue, 
@@ -15,6 +18,23 @@ function App() {
     processManual,
     clearInput 
   } = useJsonProcessor(settings.live)
+
+  // Check screen size on mount and resize
+  useEffect(() => {
+    const checkScreenSize = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+    
+    checkScreenSize()
+    window.addEventListener('resize', checkScreenSize)
+    
+    return () => window.removeEventListener('resize', checkScreenSize)
+  }, [])
+
+  // Show mobile warning if screen is too small
+  if (isMobile) {
+    return <MobileWarning />
+  }
 
   return (
     <div className="app">
