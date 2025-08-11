@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useCallback, useState } from 'react'
 import { ProcessedResult, Settings } from '../types'
 import { getErrorSuggestion, getVisualLineNumber } from '../utils/jsonUtils'
 import ConfigurationFooter from './ConfigurationFooter'
+import CopyAsCodeDropdown from './CopyAsCodeDropdown'
 
 
 interface OutputPaneProps {
@@ -286,6 +287,21 @@ const OutputPane: React.FC<OutputPaneProps> = ({ result, visualize, settings, on
     }
   }
 
+  const handleCopyAsCode = async (generator: any) => {
+    if (result?.result.obj) {
+      try {
+        const code = generator.generate(result.result.obj, {
+          indentSize: settings.tabSize,
+          useSpaces: true
+        })
+        await navigator.clipboard.writeText(code)
+        // You could add a toast notification here
+      } catch (err) {
+        console.error('Failed to copy code:', err)
+      }
+    }
+  }
+
   const renderTree = (value: any, key?: string | number) => {
     if (value === null || typeof value !== 'object') {
       return (
@@ -337,6 +353,7 @@ const OutputPane: React.FC<OutputPaneProps> = ({ result, visualize, settings, on
             <strong>Output</strong>
             <div className="spacer"></div>
             <button className="btn good" disabled>Copy</button>
+            <CopyAsCodeDropdown onCopy={handleCopyAsCode} disabled />
             <button className="btn" disabled>Download .json</button>
           </div>
         </header>
@@ -383,6 +400,7 @@ const OutputPane: React.FC<OutputPaneProps> = ({ result, visualize, settings, on
             <strong>Output</strong>
             <div className="spacer"></div>
             <button className="btn good" disabled>Copy</button>
+            <CopyAsCodeDropdown onCopy={handleCopyAsCode} disabled />
             <button className="btn" disabled>Download .json</button>
           </div>
         </header>
@@ -440,6 +458,7 @@ const OutputPane: React.FC<OutputPaneProps> = ({ result, visualize, settings, on
             <strong>Output</strong>
             <div className="spacer"></div>
             <button className="btn good" onClick={handleCopy}>Copy</button>
+            <CopyAsCodeDropdown onCopy={handleCopyAsCode} />
             <button className="btn" onClick={handleDownload}>Download .json</button>
           </div>
         </header>
@@ -520,6 +539,7 @@ const OutputPane: React.FC<OutputPaneProps> = ({ result, visualize, settings, on
           <strong>Output</strong>
           <div className="spacer"></div>
           <button className="btn good" disabled>Copy</button>
+          <CopyAsCodeDropdown onCopy={handleCopyAsCode} disabled />
           <button className="btn" disabled>Download .json</button>
         </div>
       </header>
